@@ -1,0 +1,2432 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://api.github.com; img-src 'self' data: blob:; base-uri 'none'; form-action 'none'">
+<title>改稿机</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* 木の机に原稿を広げた画面: 本文は明朝で広く、操作は細いゴシックで控えめに。色は胡桃材と生成りの紙から。
+   明るい・暗いは端末の設定に引っぱられず、画面の右上で自分で切り替える（data-desk）。 */
+:root{
+  --paper:#f3ede4; --sheet:#fffcf7; --ink:#2a211b; --muted:#7b6b5e; --rule:#e5dacd; --rule-strong:#cdbcaa;
+  --accent:#6e4527; --accent-ink:#fffaf3; --accent-soft:rgba(110,69,39,.10);
+  --ins:rgba(104,128,52,.18); --ins-line:#6b8434; --del:#a5432f; --del-bg:rgba(165,67,47,.10);
+  --tag:rgba(226,177,64,.36); --tag-soft:rgba(226,177,64,.15); --tag-line:#bf8a1f; --blank:#3f5f8a; --blank-bg:rgba(63,95,138,.12);
+  --sel:rgba(110,69,39,.12); --shadow:0 10px 30px rgba(42,28,18,.16); --scrim:rgba(30,20,12,.40);
+  --f-text:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho","YuMincho",serif;
+  --f-ui:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  --r:10px; color-scheme:light;
+  --fs-text:16px; --lh-text:1.95; /* 本文の文字の大きさと行間（設定タブで端末ごとに変える） */
+}
+:root[data-desk="dark"]{
+  --paper:#1f1813; --sheet:#2a211a; --ink:#ede2d5; --muted:#ab9888; --rule:#3d3027; --rule-strong:#57463a;
+  --accent:#d9a877; --accent-ink:#24190f; --accent-soft:rgba(217,168,119,.14);
+  --ins:rgba(160,190,100,.20); --ins-line:#a9c46a; --del:#e8907a; --del-bg:rgba(232,144,122,.13);
+  --tag:rgba(230,185,80,.27); --tag-soft:rgba(230,185,80,.11); --tag-line:#e0b453; --blank:#9fbbe3; --blank-bg:rgba(159,187,227,.15);
+  --sel:rgba(217,168,119,.15); --shadow:0 10px 30px rgba(0,0,0,.5); --scrim:rgba(8,5,3,.55); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--paper)}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.6;padding-inline:16px;padding-block:0 120px}
+.wrap{max-width:1180px;margin:0 auto}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* claude.ai は画面の上に余白（safe-area-inset-top）を足す。見出しをその余白まで伸ばし、上のすき間に本文がすけて見えないようにする */
+header.top{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1px solid var(--rule);margin:calc(-1 * env(safe-area-inset-top,0px)) -16px 0;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 0}
+.top-in{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.brand-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{font-family:var(--f-text);font-size:20px;font-weight:600;letter-spacing:.12em}
+.status{font-size:12px;color:var(--muted);margin-left:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iconbtn{border:1px solid var(--rule-strong);background:var(--sheet);border-radius:99px;padding:2px 10px;font-size:12px;color:var(--muted)}
+.today{font-size:12px;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:0 8px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.work-row{display:flex;gap:8px;align-items:center}
+.shelfbtn{flex:1 1 auto;min-width:0;max-width:560px;text-align:left;padding:6px 12px;border:1px solid var(--rule-strong);border-radius:8px;background:var(--sheet);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shelfbtn .crumb{color:var(--muted)}
+.tabs{display:flex;gap:2px;overflow-x:auto}
+.tab{border:0;background:none;padding:8px 14px;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap;font-weight:500}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.badge{display:inline-block;min-width:1.6em;padding:0 .4em;margin-left:4px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-size:11px;text-align:center;font-variant-numeric:tabular-nums}
+
+.btn{border:1px solid var(--rule-strong);background:var(--sheet);border-radius:8px;padding:6px 12px;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:500}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+.btn.danger{color:var(--del);border-color:var(--del)}
+.btn.small{padding:2px 9px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
+
+main{padding-top:16px}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.seg{display:inline-flex;border:1px solid var(--rule-strong);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--sheet);padding:5px 12px;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:500}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.hint{font-size:12px;color:var(--muted)}
+.banner{border:1px dashed var(--tag-line);background:var(--tag-soft);padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.banner span{flex:1 1 220px;min-width:0}
+
+/* 本文 */
+.sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);padding:8px 0}
+.colhead{display:grid;grid-template-columns:1fr 1fr;font-size:12px;color:var(--muted);padding:2px 0 6px;border-bottom:1px solid var(--rule)}
+.colhead div{padding:0 16px}
+.row{display:grid;grid-template-columns:1fr 1fr}
+.cell{display:flex;gap:10px;padding:3px 16px;min-width:0}
+.cell.o{border-right:1px solid var(--rule)}
+.ln{flex:0 0 2.6em;text-align:right;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums;padding-top:.45em;user-select:none}
+.tx{flex:1;min-width:0;font-family:var(--f-text);font-size:var(--fs-text);line-height:var(--lh-text);white-space:pre-wrap;overflow-wrap:anywhere}
+.cell.c{cursor:pointer}
+.cell.c.blankline{cursor:default}
+.cell.c.sel{background:var(--sel)}
+.cell.c.has-mark{box-shadow:inset 3px 0 0 var(--tag-line)}
+.cell.c.has-mark .tx{background:var(--tag-soft)}
+.row.empty .tx{min-height:1em}
+.d{background:var(--del-bg);color:var(--del);text-decoration:line-through;text-decoration-thickness:1px}
+.dx{font-size:.8em;color:var(--del);text-decoration:line-through;text-decoration-thickness:1px;opacity:.75;user-select:none;-webkit-user-select:none;margin:0 1px}
+.a{background:var(--ins);border-bottom:1.5px solid var(--ins-line)}
+.row.ins .cell.c .tx{background:var(--ins)}
+.row.del .cell.o .tx{background:var(--del-bg)}
+mark.m{background:var(--tag);color:inherit;border-radius:2px;padding:0 1px;box-shadow:0 1.5px 0 var(--tag-line)}
+/* 行全体の印を開く札（行の頭の番号の下） */
+.chip-m{display:block;margin-top:2px;font-family:var(--f-ui);font-size:10px;line-height:1.5;padding:0 3px;border-radius:4px;background:var(--tag);color:var(--ink);border:1px solid var(--tag-line);cursor:pointer;text-align:center;white-space:nowrap}
+/* 印の窓を開いている間の、いま書いている印の場所 */
+.cell.c.focus{background:var(--tag-soft);box-shadow:inset 4px 0 0 var(--accent),0 0 0 2px var(--accent)}
+mark.m.focus,.chip-b.focus,.chip-m.focus{outline:2px solid var(--accent);outline-offset:1px}
+.ln .chip-m + .chip-m{margin-top:3px}
+.chip-b{display:inline-block;font-family:var(--f-ui);font-size:13px;line-height:1.5;padding:0 7px;margin:0 2px;border-radius:5px;background:var(--blank-bg);color:var(--blank);border:1px solid var(--blank);cursor:pointer;white-space:nowrap;user-select:none;-webkit-user-select:none}
+.chip-b.lost{border-style:dashed}
+.insrow .cell.c .tx{font-family:var(--f-ui);font-size:13px;color:var(--blank)}
+.insrow .cell.c{cursor:default}
+.mode-work .row,.mode-work .colhead,.mode-orig .row,.mode-orig .colhead{grid-template-columns:1fr}
+.mode-work .cell.o,.mode-orig .cell.c,.mode-work .colhead .ho,.mode-orig .colhead .hc{display:none}
+.mode-work .row.del .cell.o{display:flex;opacity:.7}
+.mode-work .row.del .cell.o .tx{font-size:14px}
+.mode-work .cell.o{border-right:0}
+.mode-orig .row.ins,.mode-orig .insrow{display:none}
+/* 変更の色を隠す（右下の目のボタン）: 増えた・消えたの色と取り消し線を消し、印だけを残す */
+.sheet.nodiff .a{background:none;border-bottom:0}
+.sheet.nodiff .d{background:none;color:inherit;text-decoration:none}
+.sheet.nodiff .dx{display:none}
+.sheet.nodiff .row.ins .cell.c .tx,.sheet.nodiff .row.del .cell.o .tx{background:none}
+.sheet.mode-work.nodiff .row.del{display:none}
+.legend.nodiff .ld{display:none}
+/* その場で書き換える行（書くモード・PCのダブルクリック） */
+.cell.c.editing{cursor:text}
+textarea.inl{display:block;width:100%;min-height:0;margin:0;padding:0;border:0;border-radius:0;outline:none;resize:none;overflow:hidden;background:transparent;color:inherit;font-family:var(--f-text);font-size:var(--fs-text);line-height:var(--lh-text);white-space:pre-wrap;overflow-wrap:anywhere}
+.sheet.writing .cell.c{cursor:text}
+.editor{display:flex;flex-direction:column;gap:10px}
+.editor textarea{font-family:var(--f-text);font-size:var(--fs-text);line-height:var(--lh-text);min-height:60vh;padding:12px 14px;border:1px solid var(--rule-strong);border-radius:var(--r);background:var(--sheet);width:100%;resize:vertical}
+.emptystate{padding:48px 24px;text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center}
+.emptystate h2{font-family:var(--f-text);font-weight:600;font-size:22px;margin:0;text-wrap:balance}
+.emptystate p{margin:0;color:var(--muted);max-width:34em}
+
+/* 操作の帯 */
+.actionbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--sheet);border-top:1px solid var(--rule-strong);box-shadow:var(--shadow);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.actionbar .in{max-width:1180px;margin:0 auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.actionbar .what{flex:1 1 100%;min-width:0;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ほめる札 */
+.praise{position:fixed;right:16px;left:16px;margin-inline:auto;max-width:460px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:35;background:var(--sheet);border:1px solid var(--accent);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;display:flex;gap:10px;align-items:flex-start}
+.praise.up{bottom:calc(118px + env(safe-area-inset-bottom,0px))}
+.praise .pt{flex:1;min-width:0;font-family:var(--f-text);font-size:15px;line-height:1.8}
+.praise .pl{display:block;font-family:var(--f-ui);font-size:11px;color:var(--accent);letter-spacing:.08em;margin-bottom:2px}
+
+/* 一覧 */
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);padding:14px 16px}
+.card h3{margin:0 0 10px;font-size:14px;font-weight:700}
+.mlist{display:flex;flex-direction:column;gap:8px}
+.mitem{border:1px solid var(--rule);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--paper)}
+.mitem.done{opacity:.75}
+.mitem.touched{border-color:var(--ins-line)}
+.mhead{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.kind{font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--tag);color:var(--ink)}
+.kind.blank,.kind.insert{background:var(--blank-bg);color:var(--blank)}
+.flag{font-size:11px;padding:0 7px;border-radius:99px;border:1px solid var(--ins-line);color:var(--ins-line)}
+.where{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.quote{font-family:var(--f-text);font-size:14px;overflow-wrap:anywhere}
+.tags{display:flex;gap:4px;flex-wrap:wrap}
+.tags span{font-size:11px;border:1px solid var(--rule-strong);border-radius:99px;padding:0 7px;color:var(--muted)}
+.mfoot{display:flex;gap:6px;flex-wrap:wrap}
+.lost{font-size:12px;color:var(--del)}
+.progress{height:6px;border-radius:99px;background:var(--rule);overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);border-radius:99px}
+pre.out{white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--f-ui);font-size:12.5px;line-height:1.7;background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:12px;max-height:60vh;overflow:auto;margin:0}
+label.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+input.rqn{width:5.5em;border:1px solid var(--rule-strong);border-radius:8px;padding:4px 8px;background:var(--sheet);font-variant-numeric:tabular-nums}
+textarea,input[type=text],select.inp{width:100%;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 10px;background:var(--sheet)}
+textarea.body{font-family:var(--f-text);font-size:var(--fs-text);line-height:var(--lh-text);min-height:220px}
+/* 設定 */
+.setrow{display:grid;grid-template-columns:6.5em auto minmax(0,1fr) auto 3.6em;gap:8px;align-items:center;font-size:13px}
+.setrow input[type=range]{width:100%;accent-color:var(--accent)}
+.setrow output{font-variant-numeric:tabular-nums;color:var(--muted);text-align:right}
+.pv{font-family:var(--f-text);font-size:var(--fs-text);line-height:var(--lh-text);white-space:pre-wrap;background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:10px 14px}
+.switch{display:flex;gap:10px;align-items:center;font-size:13px;cursor:pointer}
+.switch input{width:18px;height:18px;accent-color:var(--accent)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.vlist{display:flex;flex-direction:column}
+.vitem{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--rule)}
+.vitem .meta{flex:1 1 200px;min-width:0;font-size:13px;font-variant-numeric:tabular-nums}
+.vitem .meta b{font-weight:700;margin-right:6px}
+.cur-tag{font-size:11px;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:0 7px;margin-left:6px}
+.row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stat{display:flex;gap:18px;flex-wrap:wrap;font-size:13px}
+.stat b{font-size:18px;font-variant-numeric:tabular-nums;margin-right:2px}
+.ba{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:13px;margin:0}
+.ba dt{color:var(--muted)}
+.ba dd{margin:0;font-family:var(--f-text);overflow-wrap:anywhere;white-space:pre-wrap}
+.week{display:flex;gap:4px;align-items:flex-end}
+.week div{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.week i{display:block;width:22px;border-radius:3px;background:var(--accent);min-height:2px}
+.week i.zero{background:var(--rule)}
+.saybox{font-family:var(--f-text);font-size:14px;line-height:1.8;border-left:3px solid var(--accent);padding:4px 10px;white-space:pre-wrap}
+
+/* 入力の窓 */
+/* 窓の下敷き: キーボードが出ているときは見えている範囲（--vvt・--vvh）に合わせる */
+.scrim{position:fixed;left:0;right:0;top:var(--vvt,0px);height:var(--vvh,100%);background:var(--scrim);z-index:40;display:flex;align-items:center;justify-content:center;padding:16px}
+.dialog{background:var(--sheet);border-radius:14px;box-shadow:var(--shadow);width:min(640px,100%);max-height:calc(100% - 32px);overflow:auto;padding:18px 20px 0;display:flex;flex-direction:column;gap:14px}
+.dialog h2{margin:0;font-size:16px}
+/* 窓の中身は縮めずに、窓のほうをスクロールさせる（引用の枠がつぶれて読めなくならないように） */
+.dialog > *{flex-shrink:0}
+.dq{font-family:var(--f-text);font-size:15px;background:var(--paper);border-left:3px solid var(--tag-line);padding:6px 10px;overflow-wrap:anywhere;max-height:8.5em;overflow:auto}
+.dq .caret{color:var(--blank);font-family:var(--f-ui);font-weight:700}
+.group{display:flex;flex-direction:column;gap:6px}
+.group .gl{font-size:12px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:1px solid var(--rule-strong);background:var(--sheet);border-radius:99px;padding:3px 11px;font-size:12.5px}
+.chips button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chips button .ord{font-size:10px;margin-left:4px;opacity:.85}
+.dfoot{position:sticky;bottom:0;margin:0 -20px;padding:12px 20px calc(14px + env(safe-area-inset-bottom,0px));background:var(--sheet);border-top:1px solid var(--rule);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.dfoot .left{margin-right:auto}
+.checks{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.checks label{display:flex;gap:8px;align-items:flex-start}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:50;background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-size:13px;max-width:calc(100% - 32px)}
+.fab{position:fixed;right:16px;bottom:calc(var(--barh,0px) + 18px + env(safe-area-inset-bottom,0px));z-index:32;display:flex;flex-direction:column;gap:10px}
+.fab button{width:48px;height:48px;border-radius:50%;border:1px solid var(--rule-strong);background:var(--sheet);color:var(--accent);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;padding:0}
+.fab button.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.fab button:disabled{opacity:.35;box-shadow:none;cursor:default}
+.fab button[aria-pressed="true"]{background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--sheet);border:2px solid var(--accent)}
+.fab svg{width:22px;height:22px}
+body.sheet-open .fab{display:none}
+body.has-fab .praise{right:80px}
+body.has-fab .toast{bottom:calc(var(--barh,0px) + 260px + env(safe-area-inset-bottom,0px))}
+/* 印の中身の吹き出し（PCはカーソルを合わせたとき、スマホは1回目のタップ） */
+.peek{position:fixed;z-index:36;max-width:min(340px,calc(100vw - 24px));background:var(--sheet);border:1px solid var(--rule-strong);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;font-size:13px;line-height:1.6;display:flex;flex-direction:column;gap:6px}
+.peek.hoveronly{pointer-events:none}
+.peek .pk-c{font-family:var(--f-text);font-size:14px;overflow-wrap:anywhere}
+.peek .pk-b{display:flex;gap:6px;justify-content:flex-end}
+/* 印の中身を本文の下に出す行 */
+.noterow .cell.c{cursor:default;padding-top:0}
+.noterow .tx{font-family:var(--f-ui);font-size:12px;line-height:1.6;color:var(--muted)}
+.noterow .nt{display:block;cursor:pointer}
+.noterow .nt b{color:var(--tag-line);font-weight:700;margin-right:4px}
+.mode-orig .noterow{display:none}
+.toastbtn{margin-left:10px;border:1px solid var(--paper);background:none;color:var(--paper);border-radius:6px;padding:1px 10px;font-size:13px;font-weight:500}
+
+/* 棚（作業とフォルダ） */
+.tree{display:flex;flex-direction:column;gap:2px}
+.tree details{border-left:1px solid var(--rule);margin-left:6px;padding-left:10px}
+.tree summary{cursor:pointer;padding:5px 0;font-weight:700;display:flex;gap:6px;align-items:center;flex-wrap:wrap;list-style:none}
+.tree summary::-webkit-details-marker{display:none}
+.tree summary::before{content:"▸";color:var(--muted);font-size:11px;width:1em}
+.tree details[open]>summary::before{content:"▾"}
+.tree summary .cnt{font-weight:400;font-size:12px;color:var(--muted)}
+.tree summary .fbtns{margin-left:auto;display:flex;gap:4px}
+.witem{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:6px 8px;border-radius:8px;font-size:14px}
+.witem:hover{background:var(--accent-soft)}
+.witem.cur{background:var(--accent-soft);color:var(--accent);font-weight:500}
+.witem .sub{font-size:12px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+.help ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px}
+
+.brk{display:none}
+@media (max-width:760px){
+  /* 一行目は名前と操作、二行目に今日の数と保存の状態 */
+  .brand-row{row-gap:4px}
+  .setrow{grid-template-columns:auto minmax(0,1fr) auto 3.4em}
+  .setrow label{grid-column:1 / -1}
+  .grid2{grid-template-columns:minmax(0,1fr)}
+  .cell{padding:3px 10px;gap:8px}
+  .ln{flex-basis:2.2em}
+  .seg .only-wide{display:none}
+  .scrim{align-items:flex-end;padding:0}
+  .dialog{width:100%;border-radius:14px 14px 0 0;max-height:88%}
+  /* 印の窓は下半分だけ。上半分の本文は見えたまま、スクロールもできる */
+  .scrim.half{background:transparent;pointer-events:none}
+  .scrim.half .dialog{pointer-events:auto;max-height:50%;box-shadow:0 -8px 28px rgba(30,20,12,.22);border-top:1px solid var(--rule-strong)}
+  /* 文字を入れている間は、見出し・コメント欄・ボタンだけの小さな窓にして、上に本文を残す */
+  .scrim.half.typing .dialog > :not(h2):not(.dfoot):not(.picked):not(:focus-within){display:none}
+  .scrim.half.typing .picked{display:flex}
+  .scrim.half.typing .dialog{gap:8px;padding-top:12px}
+  .scrim.half.typing .dfoot{padding-bottom:10px}
+  body.sheet-open{padding-bottom:60vh}
+  /* 16px未満の入力欄は、触ると画面が拡大されてしまうので16px以上に */
+  input[type=text],input.rqn,select.inp,textarea{font-size:16px}
+  /* キーボードが出ている間は右下のボタンを隠す（入力欄に重ならないように） */
+  body.inline-on .fab{display:none}
+  textarea.body,.editor textarea{font-size:max(16px, var(--fs-text))}
+}
+/* 入力中に出す「選んだ分類」の一覧（スマホで入力しているときだけ） */
+.picked{display:none;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px}
+.picked span{border-radius:99px;padding:1px 9px;background:var(--accent);color:var(--accent-ink)}
+.picked span.none{background:none;color:var(--muted);padding:0}
+.picked button{margin-left:auto}
+.editbox{border:1px solid var(--rule);border-radius:8px;padding:8px 12px;background:var(--paper)}
+.editbox summary{cursor:pointer;font-size:13px;color:var(--accent);font-weight:500}
+.editbox textarea{min-height:0}
+.chipnote{font-size:12.5px;line-height:1.7;background:var(--paper);border-left:3px solid var(--accent);border-radius:4px;padding:6px 10px}
+.chipnote b{font-weight:700}
+@media (prefers-reduced-motion:no-preference){.dialog.rise{animation:rise .16s ease-out}@keyframes rise{from{transform:translateY(8px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+
+<style>
+/* GitHub版の合言葉の画面。開けるまで本文の画面を覆う */
+#lock{position:fixed;inset:0;z-index:1000;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:16px}
+.lock-card{width:min(360px,100%);background:var(--sheet);border:1px solid var(--rule);border-radius:var(--r);box-shadow:var(--shadow);padding:24px 20px;display:flex;flex-direction:column;gap:12px}
+.lock-card h1{margin:0;font-family:var(--f-text);font-size:22px;font-weight:600;letter-spacing:.12em;text-align:center}
+.lock-card label{font-size:13px;color:var(--muted)}
+/* 合言葉は伏せ字で見せる。type="password" にするとブラウザが保存を勧めて端末に残りうるので、ふつうの欄を伏せ字にする */
+#lockPass{-webkit-text-security:disc;text-security:disc;width:100%;padding:10px 12px;border:1px solid var(--rule-strong);border-radius:8px;background:var(--paper);font-size:16px}
+#lockGo{padding:10px;border-radius:8px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700}
+#lockGo:disabled,#lockPass:disabled{opacity:.6}
+#lockMsg{margin:0;font-size:12px;color:var(--muted);line-height:1.6}
+</style>
+<div id="lock" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+  <div class="lock-card">
+    <h1 id="lockTitle">改稿机</h1>
+    <label for="lockPass">合言葉</label>
+    <input type="text" id="lockPass" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button type="button" id="lockGo">開く</button>
+    <p id="lockMsg">データは暗号化して保存しています。このページは端末に何も残しません。</p>
+  </div>
+</div>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand-row">
+      <span class="brand">改稿机</span>
+      <span class="today" id="today" hidden></span>
+      <span class="status" id="status">読み込み中…</span>
+    </div>
+    <div class="work-row">
+      <button class="shelfbtn" id="shelfBtn" aria-label="作業を選ぶ">作業を選ぶ</button>
+      <button class="btn" id="newWorkBtn">新しい作業</button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" data-view="text" aria-selected="true">本文</button>
+      <button class="tab" role="tab" data-view="request">依頼<span class="badge" id="openCount">0</span></button>
+      <button class="tab" role="tab" data-view="versions">版</button>
+      <button class="tab" role="tab" data-view="log">記録</button>
+      <button class="tab" role="tab" data-view="settings">設定</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap"><main id="main"></main></div>
+<div id="bar"></div>
+<div id="praise"></div>
+<div id="fab"></div>
+<div id="modal"></div>
+<div id="toast" hidden class="toast"></div>
+
+<script>
+(() => {
+"use strict";
+// ---------- 分類（改稿チャットの分類の手引き 2026-10-04 から） ----------
+const CONCERNS = ["リズム・文の流れ","文末","近接・重複","人物らしさ・口調","視点・見え方","説明くさい・わざとらしい","時代・語彙","印象・含み","整合性・事実","情報の補い・分かりやすさ","展開・間","比喩・表現の違和感","語の指定","締め・余韻","なんとなく引っかかる"];
+const ADDS = ["心の動き・反応","動作・しぐさ","情景・場の様子","時間の経過・間","説明・事情","台詞の言い方","締め・余韻","つなぎ（場面・話題の移り）"];
+const DIRECTIONS = ["削る・短く","足す・詳しく","一文にまとめる","分ける","語や言い回しを替える","印象を変える（やわらかく・明るく等）","人物らしくする","整合をとる","位置・順序を変える","文末・リズムを整える","案を出してほしい（方向の指定なし）"];
+const FIX_TYPES = ["既存の文を直す","一文にまとめる","相談"];
+const FORMAT = "改稿依頼 v1";
+// 分類を押したときに出す、選び方の説明と例（改稿チャットの分類の手引きの目安から）
+const NOTES = {
+  type: {
+    "既存の文を直す": "書いてある文を直してほしいとき。いちばんふつうの依頼です。",
+    "一文にまとめる": "選んだ二つ以上の文を、一つの文に編んでほしいとき。例：短い文が続いてぶつ切りに感じる。",
+    "相談": "直すか消すか、どこに入れるかなど、まず意見がほしいとき。AIは意見を先に述べ、必要なら案を添えます。",
+  },
+  concerns: {
+    "リズム・文の流れ": "読みにくい、つながりが悪い、文の長さが単調なとき。例：短い文が三つ続いてぶつ切りに感じる。",
+    "文末": "文末の形が気になるとき。例：「〜た。」が続く、文末の決まりに合わない。",
+    "近接・重複": "近くで同じ語や同じ動作が重なるとき。例：二行前にも「静かに」がある。",
+    "人物らしさ・口調": "その人物が言いそう・しそうにないとき。例：この人物ならここで謝らない、口調が硬すぎる。",
+    "視点・見え方": "語り手が知りえないことを書いている、内面に入りすぎているとき。例：語り手の視点なのに相手の気持ちを言い切っている。",
+    "説明くさい・わざとらしい": "説明しすぎ、言わせすぎのとき。例：気持ちを台詞でそのまま言わせている。",
+    "時代・語彙": "時代や設定に合わない語・考え方があるとき。例：この時代にない言葉や道具が出てくる。",
+    "印象・含み": "読み手の受ける印象が意図と違うとき。例：黙っているだけで威圧的に見える、冷たく見える。",
+    "整合性・事実": "矛盾や位置関係、生き物の生態など、事実の誤りがあるとき。例：さっき座ったのにまた座っている。",
+    "情報の補い・分かりやすさ": "唐突、読み取りにくい、様子が思い浮かばないとき。例：誰の台詞か分かりにくい。",
+    "展開・間": "展開が早い、テンポや間が合わないとき。例：返事までの間がなくて急に感じる。",
+    "比喩・表現の違和感": "比喩や言い回しそのものが不自然、意味が通らないとき。例：「空気が止まる」に違和感。台詞で、その人物が言いそうにないのが理由なら「人物らしさ・口調」へ。",
+    "語の指定": "特定の語を別の語に替えたいとき。例：「微笑む」を別の言い方に。替えたい語や候補はコメントに書くと確実です。",
+    "締め・余韻": "場面や段落の終わり方が気になるとき。例：言い切りで終わって余韻がない。",
+    "なんとなく引っかかる": "どこがどう、とは言えないけれど読んでいて引っかかるとき。AIが本文から理由の候補を推し量り、候補ごとに直し案を出します。ほかの分類やコメントを一緒に付けると、手がかりになります。",
+  },
+  directions: {
+    "削る・短く": "長い・くどいので、削って短くしてほしいとき。",
+    "足す・詳しく": "情報や描写を足して、分かりやすく・豊かにしてほしいとき。",
+    "一文にまとめる": "複数の文を一つにまとめてほしいとき。",
+    "分ける": "長い文を二つ以上に分けてほしいとき。",
+    "語や言い回しを替える": "意味はそのままで、言葉や言い回しを替えてほしいとき。",
+    "印象を変える（やわらかく・明るく等）": "受ける印象を変えてほしいとき。どう変えたいか（やわらかく、明るく、冷たく等）はコメントに書くと伝わります。",
+    "人物らしくする": "その人物の言い方・しぐさ・考え方に寄せてほしいとき。",
+    "整合をとる": "矛盾や事実の誤りを直してほしいとき。",
+    "位置・順序を変える": "文や情報の順番を入れ替えてほしいとき。例：理由を先に出す、動作の後に台詞を置く。",
+    "文末・リズムを整える": "文末の形や文の長短を整えてほしいとき。",
+    "案を出してほしい（方向の指定なし）": "どう直すかも含めてAIに考えてほしいとき。迷ったらこれで大丈夫です。",
+  },
+  adds: {
+    "心の動き・反応": "人物の気持ちの動きや、出来事への反応を入れたいとき。例：声をかけられて少し驚く。",
+    "動作・しぐさ": "手や体の動き、癖を入れたいとき。例：答える前に袖をつまむ。",
+    "情景・場の様子": "周りの景色や音、光、においを入れたいとき。例：雨上がりの土のにおい。",
+    "時間の経過・間": "時間がたったことや、沈黙の間を入れたいとき。例：しばらく誰も口を開かなかった。",
+    "説明・事情": "読み手に必要な背景や理由を入れたいとき。例：なぜここに来たのか。",
+    "台詞の言い方": "台詞の前後に、言い方や声の調子を入れたいとき。例：小さな声で、笑いを含んで。",
+    "締め・余韻": "場面や段落の終わりに置く一文を入れたいとき。",
+    "つなぎ（場面・話題の移り）": "場面や話題が変わるところのつなぎを入れたいとき。例：翌朝になって、話が途切れたところで。",
+  },
+};
+
+// ---------- 端末ごとの覚え書き（壊れても動くように） ----------
+// GitHub版: 端末には何も残さないので、覚え書き（表示の設定や書きかけ）はページを開いている間だけ持つ
+const lsMem = new Map();
+const ls = {
+  get(k, d){ return lsMem.has(k) ? JSON.parse(lsMem.get(k)) : d; },
+  set(k, v){ lsMem.set(k, JSON.stringify(v)); },
+  del(k){ lsMem.delete(k); },
+};
+
+// ---------- 明るさ（端末の設定に引っぱられない） ----------
+let desk = ls.get("kaikou.desk", "light") === "dark" ? "dark" : "light";
+function applyDesk(){ document.documentElement.setAttribute("data-desk", desk); }
+applyDesk();
+// 本文の文字の大きさと行間（端末ごと）
+const TXT_DEF = {fs:16, lh:1.95};
+const clampN = (v, lo, hi, d) => Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
+let txt = (() => { const v = ls.get("kaikou.text", TXT_DEF) || TXT_DEF; return {fs: clampN(+v.fs, 13, 24, TXT_DEF.fs), lh: clampN(+v.lh, 1.4, 2.6, TXT_DEF.lh)}; })();
+function applyText(){ const r = document.documentElement.style; r.setProperty("--fs-text", txt.fs + "px"); r.setProperty("--lh-text", String(txt.lh)); }
+applyText();
+
+// ---------- 状態 ----------
+let store = null;          // 保存先（claude.aiの保存 または この端末）
+let works = [];            // 一覧 {id,title,section,folder,updatedAt}
+let folders = [];          // フォルダの道筋 "枝頭の春/3章"
+let activity = {days:{}, praises:[]};
+let cur = null;            // 開いている作業
+let baseText = null, baseLabel = "原文", baseN = null;   // 比べる相手（baseN は版の番号、原文なら null）
+let showNotes = ls.get("kaikou.showNotes", false) === true;   // 印の中身を本文の下に出す（端末ごと）
+let noDiff = ls.get("kaikou.noDiff", false) === true;         // 増えた・消えたの色を隠して印だけ見る（端末ごと）
+let writeMode = false;     // 書くモード: 行をタップすると、その場で書き換える
+let inline = null;         // その場で書き換えている行 {i, orig, ta}
+const touchUI = window.matchMedia("(hover: none)").matches;   // カーソルのない端末（スマホ）
+// 版の見出し: 原文、または保存した時刻と題
+const verTitle = v => v.n === 0 ? "原文" : `${fmtTime(v.at)}${v.note ? "　" + v.note : ""}`;
+const verShort = v => v.n === 0 ? "原文" : (v.note || fmtTime(v.at));
+let versionsCache = null, requestsCache = null;
+let view = "text";
+let pane = "work";
+let editing = null;        // 本文をまるごと書き換えている間 {text}
+let focus = null;          // 印の窓を開いている間 {id, pending}（pending はまだ付けていない新しい印）
+const sel = {lines:new Set(), range:null};
+const SCOPES = [["500","約500字"],["1000","約1000字"],["2000","約2000字"],["3000","約3000字"],["all","本文すべて"],["lines","行で指定"]];
+// 既定は本文すべて（v2.1で既定を変えたので覚え書きの名前も変えた）
+let outScope = (() => { const v = ls.get("kaikou.outScope2", "all"); return SCOPES.some(x => x[0] === v) ? v : "all"; })();
+let praiseOn = ls.get("kaikou.praise", true) !== false;
+let markScope = ls.get("kaikou.markScope", "all") === "lines" ? "lines" : "all";   // 依頼に入れる印（すべて／行で指定）
+const scopeLabel = (v, rg) => v === "all" ? "本文すべて" : v === "lines" ? (rg ? `L${rg.a}～L${rg.b}` : "行で指定") : v === "near" ? "前後だけ" : `前後 約${v}字`;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const nowIso = () => new Date().toISOString();
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const circ = n => n <= 20 ? String.fromCharCode(0x2460 + n - 1) : `(${n})`;
+const nsLen = s => s.replace(/\s/g,"").length;
+const fmtTime = iso => { try { const d = new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; } catch { return iso; } };
+const clone = o => JSON.parse(JSON.stringify(o));
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+// 引用は各行の前後の空白（字下げの全角空白も）を削ってつなぐ
+const qt = s => String(s || "").split("\n").map(l => l.trim()).filter(Boolean).join("");
+
+// act を渡すと、トーストに押せるボタン（取り消すなど）を付け、少し長く出す
+function toast(msg, act){
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  if (act) { const b = document.createElement("button"); b.className = "toastbtn"; b.textContent = act.label; b.onclick = () => { t.hidden = true; act.fn(); }; t.append(" ", b); }
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.hidden = true, act ? 6000 : 2400);
+}
+// 本文を新しい版にしたときの知らせ（すぐ取り消せる）
+function savedToast(){ toast("書き換えを保存しました", undoTop() ? {label:"取り消す", fn:undoLast} : null); }
+function setStatus(s){ $("#status").textContent = s; }
+// claude.ai の保存は1件256KiBまで。超えると「arguments must be plain JSON data within …」と断られるので、送る前に大きさを測る
+const DOC_LIMIT = 256 * 1024, DOC_WARN = 200 * 1024;
+const docBytes = o => new TextEncoder().encode(JSON.stringify(o)).length;
+const kb = n => Math.ceil(n / 1024) + "KB";
+function errText(e){
+  const c = e && e.code, m = (e && e.message) || "";
+  if (c === "quota_exceeded") return "保存の容量がいっぱいです。使わない作業を削除してください";
+  if (c === "invalid_argument" || c === "transform_error" || /plain JSON|KiB/i.test(m)) return "1回に保存できる大きさ（256KB）を超えました";
+  return m || String(e);
+}
+
+// ---------- 合言葉による暗号化（GitHub版と初回設定で共通） ----------
+// 合言葉から PBKDF2（SHA-256、60万回）で鍵を作り、gzip で縮めてから AES-GCM で暗号化する。
+// 置くファイルは {v, kdf, iter, z, salt, iv, ct} の JSON で、中身は合言葉がないと読めない。
+const KDF_ITER = 600000;
+const te = new TextEncoder(), td = new TextDecoder();
+const b64 = u8 => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const pipeBytes = async (u8, t) => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(t)).arrayBuffer());
+async function deriveKey(pass, salt, iter){
+  const base = await crypto.subtle.importKey("raw", te.encode(pass.normalize("NFC")), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2", hash:"SHA-256", salt, iterations:iter}, base, {name:"AES-GCM", length:256}, false, ["encrypt", "decrypt"]);
+}
+// 新しい塩で鍵を作る（初回設定で使う）
+async function newKey(pass){ const salt = crypto.getRandomValues(new Uint8Array(16)); return {key: await deriveKey(pass, salt, KDF_ITER), salt, iter: KDF_ITER}; }
+async function seal(k, text){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const pt = await pipeBytes(te.encode(text), new CompressionStream("gzip"));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv}, k.key, pt));
+  return JSON.stringify({v:1, kdf:"PBKDF2-SHA256", iter:k.iter, z:"gzip", salt:b64(k.salt), iv:b64(iv), ct:b64(ct)});
+}
+// 合言葉が違うときは {code:"badpass"} を投げる。解けたら、同じ鍵で暗号化し直せるように鍵も返す
+async function unseal(pass, boxText){
+  let box; try { box = JSON.parse(boxText); } catch { throw {code:"broken"}; }
+  const salt = unb64(box.salt), key = await deriveKey(pass, salt, box.iter);
+  let pt;
+  try { pt = new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM", iv:unb64(box.iv)}, key, unb64(box.ct))); }
+  catch { throw {code:"badpass"}; }
+  if (box.z === "gzip") pt = await pipeBytes(pt, new DecompressionStream("gzip"));
+  return {text: td.decode(pt), k: {key, salt, iter: box.iter}};
+}
+// GitHub の API。cache は使わない（古い中身を読んで上書きしないように）
+const GH_API = "https://api.github.com";
+const GH_WHO = {name:"desk", email:"desk@example.invalid"};   // 記録に残る名前（あなたのメールアドレスを残さない）
+function ghApi(token, path, opt = {}){
+  return fetch(GH_API + path, {...opt, cache:"no-store", headers:{"Accept":"application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28", "Authorization":"Bearer " + token, ...(opt.headers || {})}});
+}
+// git の blob の sha（上書きのときに「読んだときの中身」を示すのに使う）
+async function blobSha(u8){
+  const head = te.encode(`blob ${u8.length}\0`), all = new Uint8Array(head.length + u8.length);
+  all.set(head); all.set(u8, head.length);
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-1", all))].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+
+// ---------- GitHub版: 合言葉で開き、暗号化して非公開のリポジトリへ保存する ----------
+// key.enc（このページと同じ場所）に GitHub の鍵と保存先、data.enc（非公開のリポジトリ）に全データが入っている。
+// 端末には何も残さない: データはこのページの中だけに持ち、閉じれば消える。
+const GH_MIN_GAP = 4000;            // 続けて来た保存は、4秒の間をあけて1回にまとめて送る
+const GH_IDLE = 30 * 60 * 1000;     // 30分さわらなければ閉じて鍵をかける
+let gh = null;                      // {token, owner, repo, path, sha, k, data, conflict}
+let ghRev = 0, ghSavedRev = 0;      // 変えた回数と、GitHubに届いた回数（違えば未保存がある）
+const ghUnsaved = () => gh && ghRev !== ghSavedRev;
+const GH_CONFLICT = {code:"conflict", message:"GitHub上のデータが、このページを開いた後に別の場所で変わりました。上書きしないよう保存を止めています。ページを読み直してください"};
+const LOCK_ERR = {badpass:"合言葉が違います", nokey:"鍵のファイル（key.enc）が見つかりません。初回設定がまだです", token:"GitHubの鍵が使えません（期限切れか取り消し）", broken:"保存されたファイルが壊れています", nodata:"データのファイル（data.enc）が見つかりません"};
+
+async function ghUnlock(pass){
+  const kr = await fetch("./key.enc", {cache:"no-store"});
+  if (!kr.ok) throw {code:"nokey"};
+  const conf = JSON.parse((await unseal(pass, await kr.text())).text);
+  const dr = await ghApi(conf.token, `/repos/${conf.owner}/${conf.repo}/contents/${conf.path}`, {headers:{Accept:"application/vnd.github.raw"}});
+  if (dr.status === 401) throw {code:"token"};
+  if (dr.status === 404) throw {code:"nodata"};
+  if (!dr.ok) throw {message:`GitHubから読めませんでした（${dr.status}）`};
+  const raw = new Uint8Array(await dr.arrayBuffer());
+  const x = await unseal(pass, td.decode(raw)), body = JSON.parse(x.text);
+  const data = body.data || {};
+  for (const f of ["works", "versions", "requests", "undo", "meta"]) data[f] ||= {};
+  gh = {token:conf.token, owner:conf.owner, repo:conf.repo, path:conf.path, sha:await blobSha(raw), k:x.k, data, conflict:false};
+}
+
+async function ghPush(){
+  if (gh.conflict) throw GH_CONFLICT;
+  const rev = ghRev;
+  const sealed = await seal(gh.k, JSON.stringify({format:"kaikou-gh-1", data:gh.data}));
+  let r;
+  try {
+    r = await ghApi(gh.token, `/repos/${gh.owner}/${gh.repo}/contents/${gh.path}`, {method:"PUT", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({message:"update", content:b64(te.encode(sealed)), sha:gh.sha, committer:GH_WHO, author:GH_WHO})});
+  } catch { throw {code:"unavailable"}; }
+  if (r.status === 409 || r.status === 422) { gh.conflict = true; throw GH_CONFLICT; }
+  if (r.status === 401) throw {message:LOCK_ERR.token};
+  if (!r.ok) throw r.status >= 500 || r.status === 403 || r.status === 429 ? {code:"unavailable"} : {message:`GitHubに保存できませんでした（${r.status}）`};
+  gh.sha = (await r.json()).content.sha;
+  ghSavedRev = rev;
+}
+// 保存を頼まれたら待ち行列に入れ、まとめて1回送る。送れた時点で、それまでに頼んだ人すべてに「済んだ」と返す
+let ghWaiters = [], ghRunning = false, ghLastAt = 0, ghRetry = null;
+function ghSave(){ return new Promise((ok, no) => { ghWaiters.push({ok, no}); if (!ghRunning) ghLoop(); }); }
+async function ghLoop(){
+  ghRunning = true;
+  while (ghWaiters.length) {
+    await new Promise(r => setTimeout(r, Math.max(300, ghLastAt + GH_MIN_GAP - Date.now())));
+    const batch = ghWaiters.splice(0);
+    try { await ghPush(); batch.forEach(w => w.ok()); }
+    catch (e) { batch.forEach(w => w.no(e)); }
+    ghLastAt = Date.now();
+  }
+  ghRunning = false;
+  // つながらずに送れなかった変更が残っていれば、あとでもう一度送る
+  clearTimeout(ghRetry);
+  if (ghUnsaved() && !gh.conflict) ghRetry = setTimeout(() => ghSave().then(() => setStatus(`保存しました（${store.label}）`), () => {}), 8000);
+}
+
+// 端末保存と同じ形のデータを、ページの中に持つ。変えたら GitHub へ送り、届いてから返す
+function ghStore(){
+  const d = gh.data, c = o => o == null ? null : JSON.parse(JSON.stringify(o));
+  const ch = () => { ghRev++; return ghSave(); };
+  return {
+    label: "GitHubに暗号化して保存",
+    async listWorks(){ return Object.values(d.works).map(w => ({id:w.id,title:w.title,section:w.section,folder:w.folder||"",updatedAt:w.updatedAt,open:(w.marks||[]).filter(m=>m.status==="open").length})).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)); },
+    async getWork(id){ return c(d.works[id]); },
+    async putWork(w){ d.works[w.id] = c(w); await ch(); },
+    async deleteWork(id){ delete d.works[id]; delete d.versions[id]; delete d.requests[id]; delete d.undo[id]; await ch(); },
+    async addVersion(id, v){ d.versions[id] = (d.versions[id] || []).filter(x => x.n !== v.n).concat([c(v)]); await ch(); },
+    async deleteVersion(id, n){ d.versions[id] = (d.versions[id] || []).filter(v => v.n !== n); await ch(); },
+    async listVersions(id){ return c(d.versions[id] || []).sort((a,b)=>a.n-b.n); },
+    async addRequest(id, r){ d.requests[id] = (d.requests[id] || []).filter(x => x.id !== r.id).concat([c(r)]); await ch(); },
+    async listRequests(id){ return c(d.requests[id] || []).sort((a,b)=>a.at.localeCompare(b.at)); },
+    async putUndo(id, key, u){ (d.undo[id] ||= {})[key] = c(u); await ch(); },
+    async getUndo(id, key){ return c((d.undo[id] || {})[key]); },
+    async deleteUndo(id, key){ if (d.undo[id]) delete d.undo[id][key]; await ch(); },
+    async getMeta(k){ return c(d.meta[k]); },
+    async putMeta(k, v){ d.meta[k] = c(v); await ch(); },
+  };
+}
+
+// 合言葉の画面。開けたら画面ごと取り除く（合言葉はページに残さない）
+function ghWaitUnlock(){
+  return new Promise(done => {
+    const inp = $("#lockPass"), msg = $("#lockMsg"), btn = $("#lockGo");
+    if (!(window.crypto && crypto.subtle && window.CompressionStream)) { msg.textContent = "このブラウザでは開けません。新しいChrome・Edge・Safari・Firefoxで開いてください"; btn.disabled = inp.disabled = true; return; }
+    inp.focus();
+    const go = async () => {
+      if (!inp.value) return;
+      btn.disabled = inp.disabled = true; msg.textContent = "開いています…";
+      try { await ghUnlock(inp.value); inp.value = ""; $("#lock").remove(); done(); }
+      catch (e) { msg.textContent = LOCK_ERR[e && e.code] || `開けませんでした（${(e && e.message) || e}）`; btn.disabled = inp.disabled = false; inp.value = ""; inp.focus(); }
+    };
+    btn.onclick = go;
+    inp.onkeydown = e => { if (e.key === "Enter" && !e.isComposing) go(); };
+  });
+}
+// 閉じて鍵をかける: 未保存を送ってから、ページを読み直してデータを消す
+async function ghClose(force){
+  if (!gh) return;
+  setStatus("保存して閉じています…");
+  try { await flush(); if (ghUnsaved()) await ghSave(); } catch {}
+  if (ghUnsaved() && !force) { setStatus("保存できていない変更があるため閉じませんでした。つながりを確かめてから、もう一度押してください"); return false; }
+  gh = null; location.replace(location.pathname);
+  return true;
+}
+let ghLastTouch = Date.now();
+["pointerdown", "keydown", "wheel", "touchstart"].forEach(t => window.addEventListener(t, () => { ghLastTouch = Date.now(); }, {passive:true, capture:true}));
+setInterval(() => { if (gh && Date.now() - ghLastTouch > GH_IDLE) ghClose(false); }, 60 * 1000);
+window.addEventListener("beforeunload", e => { if (gh && (ghUnsaved() || dirty || saving)) { e.preventDefault(); e.returnValue = ""; } });
+// 設定タブの「この端末で使い終えたら」
+function bindGhSettings(){
+  $("#ghLock").onclick = () => ghClose(false);
+  const x = $("#ghExport");
+  x.onclick = () => {
+    if (!x.dataset.armed) { x.dataset.armed = "1"; x.textContent = "もう一度押すと書き出します（暗号化していないファイルが残ります）"; return; }
+    const blob = new Blob([JSON.stringify({format:"kaikou-gh-1", exportedAt:nowIso(), data:gh.data})], {type:"application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `kaikou-data-plain-${dayKey()}.json`;
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    x.dataset.armed = ""; x.textContent = "全データを書き出す";
+  };
+}
+
+// ---------- 保存先 ----------
+function localStore(){
+  const K = "kaikou-v1";
+  const read = () => { try { return JSON.parse(localStorage.getItem(K) || "{}"); } catch { return {}; } };
+  const write = d => { try { localStorage.setItem(K, JSON.stringify(d)); } catch {} };
+  const all = () => { const d = read(); d.works ||= {}; d.versions ||= {}; d.requests ||= {}; d.undo ||= {}; d.meta ||= {}; return d; };
+  return {
+    label: "この端末だけに保存",
+    async listWorks(){ return Object.values(all().works).map(w => ({id:w.id,title:w.title,section:w.section,folder:w.folder||"",updatedAt:w.updatedAt,open:(w.marks||[]).filter(m=>m.status==="open").length})).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)); },
+    async getWork(id){ return all().works[id] || null; },
+    async putWork(w){ const d = all(); d.works[w.id] = w; write(d); },
+    async deleteWork(id){ const d = all(); delete d.works[id]; delete d.versions[id]; delete d.requests[id]; delete d.undo[id]; write(d); },
+    async addVersion(id, v){ const d = all(); (d.versions[id] ||= []).push(v); write(d); },
+    async deleteVersion(id, n){ const d = all(); d.versions[id] = (d.versions[id] || []).filter(v => v.n !== n); write(d); },
+    async listVersions(id){ return (all().versions[id] || []).slice().sort((a,b)=>a.n-b.n); },
+    async addRequest(id, r){ const d = all(); (d.requests[id] ||= []).push(r); write(d); },
+    async listRequests(id){ return (all().requests[id] || []).slice().sort((a,b)=>a.at.localeCompare(b.at)); },
+    async putUndo(id, key, u){ const d = all(); (d.undo[id] ||= {})[key] = u; write(d); },
+    async getUndo(id, key){ return (all().undo[id] || {})[key] || null; },
+    async deleteUndo(id, key){ const d = all(); if (d.undo[id]) delete d.undo[id][key]; write(d); },
+    async getMeta(k){ return all().meta[k] || null; },
+    async putMeta(k, v){ const d = all(); d.meta[k] = v; write(d); },
+  };
+}
+// claude.ai の保存から読んだ文書は書き換え禁止（凍結）で届くので、必ず写しにしてから使う
+function dbStore(db){
+  const W = () => db.collection("works");
+  const M = () => db.collection("meta");
+  const plain = s => s.exists ? clone(s.data()) : null;
+  return {
+    label: "claude.ai に保存（PC・スマホ共通）",
+    async listWorks(){ const s = await W().orderBy("updatedAt","desc").get(); return s.docs.map(d => { const w = d.data(); return {id:d.id,title:w.title,section:w.section,folder:w.folder||"",updatedAt:w.updatedAt,open:(w.marks||[]).filter(m=>m.status==="open").length}; }); },
+    async getWork(id){ return plain(await W().doc(id).get()); },
+    async putWork(w){ await W().doc(w.id).set(w); },
+    async deleteWork(id){
+      for (const sub of ["versions","requests","undo"]) { const s = await W().doc(id).collection(sub).get(); for (const d of s.docs) await W().doc(id).collection(sub).doc(d.id).delete(); }
+      await W().doc(id).delete();
+    },
+    async addVersion(id, v){ await W().doc(id).collection("versions").doc("v" + v.n).set(v); },
+    async deleteVersion(id, n){ await W().doc(id).collection("versions").doc("v" + n).delete(); },
+    async listVersions(id){ const s = await W().doc(id).collection("versions").get(); return s.docs.map(d => clone(d.data())).sort((a,b)=>a.n-b.n); },
+    async addRequest(id, r){ await W().doc(id).collection("requests").doc(r.id).set(r); },
+    async listRequests(id){ const s = await W().doc(id).collection("requests").get(); return s.docs.map(d => clone(d.data())).sort((a,b)=>a.at.localeCompare(b.at)); },
+    async putUndo(id, key, u){ await W().doc(id).collection("undo").doc(key).set(u); },
+    async getUndo(id, key){ return plain(await W().doc(id).collection("undo").doc(key).get()); },
+    async deleteUndo(id, key){ await W().doc(id).collection("undo").doc(key).delete(); },
+    async getMeta(k){ return plain(await M().doc(k).get()); },
+    async putMeta(k, v){ await M().doc(k).set(v); },
+  };
+}
+
+let saving = false, dirty = false, saveTimer = null;
+function scheduleSave(){
+  if (!cur || cur.sample) { renderBadge(); return; }
+  cur.updatedAt = nowIso(); dirty = true; setStatus("保存待ち…");
+  clearTimeout(saveTimer); saveTimer = setTimeout(flush, 700);
+  const w = works.find(x => x.id === cur.id); if (w) { w.updatedAt = cur.updatedAt; w.open = cur.marks.filter(m => m.status === "open").length; }
+  renderBadge();
+}
+async function flush(){
+  if (saving || !dirty || !cur || cur.sample) return;
+  const body = clone(cur), size = docBytes(body);
+  if (size > DOC_LIMIT - 4096) { dirty = false; setStatus(`保存できませんでした: この作業の記録が大きすぎます（${kb(size)}、上限256KB）。済んだ印を消すか、本文を節に分けて別の作業にしてください`); return; }
+  saving = true; dirty = false;
+  try {
+    // 返事が来ないまま止まらないように、20秒で区切って次の保存へ回す
+    await Promise.race([store.putWork(body), new Promise((_, no) => setTimeout(() => no({code:"unavailable"}), 20000))]);
+    setStatus(`保存しました（${store.label}）${size > DOC_WARN ? `｜記録が大きくなっています（${kb(size)}／上限256KB）` : ""}`);
+  }
+  catch (e) {
+    if (e && e.code === "unavailable") { dirty = true; setTimeout(flush, 1500 + Math.random()*1000); }
+    else setStatus(`保存できませんでした: ${errText(e)}`);
+  }
+  saving = false;
+  if (dirty) flush();
+}
+
+// ---------- 作業の記録（やる気の数字） ----------
+let actTimer = null;
+function bump(kind, n = 1){
+  if (cur && cur.sample) return;
+  const k = dayKey(); const d = activity.days[k] ||= {done:0, edits:0, marks:0};
+  d[kind] = (d[kind] || 0) + n;
+  renderToday();
+  clearTimeout(actTimer); actTimer = setTimeout(() => store.putMeta("activity", activity).catch(() => {}), 900);
+}
+function dayTotal(d){ return d ? (d.done||0) + (d.edits||0) + (d.marks||0) : 0; }
+function streak(){
+  let n = 0; const t = new Date();
+  if (!dayTotal(activity.days[dayKey(t)])) t.setDate(t.getDate() - 1);
+  while (dayTotal(activity.days[dayKey(t)])) { n++; t.setDate(t.getDate() - 1); }
+  return n;
+}
+function renderToday(){
+  const el = $("#today"), d = activity.days[dayKey()];
+  if (!dayTotal(d)) { const s = streak(); el.hidden = !s; el.textContent = s ? `${s}日続けて` : ""; return; }
+  const s = streak();
+  el.hidden = false;
+  const parts = [["印", d.marks], ["済み", d.done], ["書き換え", d.edits]].filter(x => x[1]).map(x => x[0] + x[1]);
+  el.textContent = `今日 ${parts.join("・")}${s >= 2 ? `｜${s}日続けて` : ""}`;
+}
+
+// ---------- 差分 ----------
+function lcsOps(a, b, eq = (x,y) => x === y){
+  const n = a.length, m = b.length;
+  if (n * m > 4e6) return [...a.map((x,i)=>({t:"del",ai:i})), ...b.map((y,j)=>({t:"ins",bj:j}))];
+  const w = m + 1, L = new Int32Array((n + 1) * w);
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    L[i*w+j] = eq(a[i], b[j]) ? L[(i+1)*w+j+1] + 1 : Math.max(L[(i+1)*w+j], L[i*w+j+1]);
+  const ops = []; let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (eq(a[i], b[j])) { ops.push({t:"eq", ai:i, bj:j}); i++; j++; }
+    else if (L[(i+1)*w+j] >= L[i*w+j+1]) { ops.push({t:"del", ai:i}); i++; }
+    else { ops.push({t:"ins", bj:j}); j++; }
+  }
+  while (i < n) ops.push({t:"del", ai:i++});
+  while (j < m) ops.push({t:"ins", bj:j++});
+  return ops;
+}
+// 行の並び（左＝比べる相手、右＝作業中）
+function alignRows(A, B){
+  const ops = lcsOps(A, B), rows = [];
+  for (let k = 0; k < ops.length;) {
+    if (ops[k].t === "eq") { rows.push({o:ops[k].ai, c:ops[k].bj, t:"eq"}); k++; continue; }
+    const dels = [], inss = [];
+    while (k < ops.length && ops[k].t !== "eq") { if (ops[k].t === "del") dels.push(ops[k].ai); else inss.push(ops[k].bj); k++; }
+    const p = Math.max(dels.length, inss.length);
+    for (let q = 0; q < p; q++) {
+      const o = q < dels.length ? dels[q] : null, c = q < inss.length ? inss[q] : null;
+      rows.push({o, c, t: o != null && c != null ? "chg" : (o != null ? "del" : "ins")});
+    }
+  }
+  return rows;
+}
+function charOps(a, b){ return a.length * b.length > 250000 ? null : lcsOps([...a], [...b]); }
+function charFlags(a, b){
+  const fa = new Array(a.length).fill(false), fb = new Array(b.length).fill(false);
+  const ops = charOps(a, b);
+  if (!ops) { fa.fill(true); fb.fill(true); return {fa, fb}; }
+  for (const op of ops) { if (op.t === "del") fa[op.ai] = true; else if (op.t === "ins") fb[op.bj] = true; }
+  return {fa, fb};
+}
+// 作業中の行に差し込む「消えた字」: 位置 -> 消えた字
+function deletedRuns(a, b){
+  const ops = charOps(a, b), map = new Map();
+  if (!ops) return map;
+  let j = 0;
+  for (const op of ops) {
+    if (op.t === "del") map.set(j, (map.get(j) || "") + a[op.ai]);
+    else j++;
+  }
+  return map;
+}
+
+// ---------- 行と印の位置 ----------
+const linesOf = t => t.replace(/\r\n?/g, "\n").split("\n");
+function lineNumbers(lines){ const map = []; let n = 0; for (const l of lines) map.push(l.trim() ? ++n : null); return map; }
+function curLines(){ return linesOf(cur.current); }
+// 印の今の位置。版を入れるたびに行の対応で運んだ位置（at）を使う。at のない古い印だけ文字で近くを探す
+function locate(m, lines){
+  if (m.at && m.at.v === cur.currentVersion) {
+    if (m.at.i < 0 || m.at.i >= lines.length) return null;
+    return {i:m.at.i, n:Math.max(1, Math.min(m.at.n, lines.length - m.at.i)), start:m.at.start, end:m.at.end};
+  }
+  return legacyLocate(m, lines);
+}
+function legacyLocate(m, lines){
+  const lo = Math.max(0, m.line - 10), hi = Math.min(lines.length - 1, m.line + 10);
+  let best = -1, bd = Infinity;
+  for (let i = lo; i <= hi; i++) if (lines[i] === m.lineTexts[0]) { const d = Math.abs(i - m.line); if (d < bd) { bd = d; best = i; } }
+  if (best < 0 && m.quote && m.quote.length >= 2) for (let i = lo; i <= hi; i++) if (lines[i].includes(m.quote)) { const d = Math.abs(i - m.line); if (d < bd) { bd = d; best = i; } }
+  if (best < 0) return null;
+  let start = m.start, end = m.end;
+  if (m.start != null) {
+    const r = findRange(lines[best], m, m.start);
+    if (!r) return null;
+    start = r.start; end = r.end;
+  }
+  return {i: best, n: m.lineTexts.length, start, end};
+}
+// 行の中で印の範囲を探し直す（語があれば語で、文中に入れる印は前後の字で）
+function findRange(L, m, near){
+  if (m.quote) {
+    let p = -1, pd = Infinity, from = 0;
+    while ((from = L.indexOf(m.quote, from)) >= 0) { const d = Math.abs(from - near); if (d < pd) { pd = d; p = from; } from++; }
+    return p < 0 ? null : {start:p, end:p + m.quote.length};
+  }
+  const cands = [];
+  if (m.ctxB) { let f = 0; while ((f = L.indexOf(m.ctxB, f)) >= 0) { cands.push(f + m.ctxB.length); f++; } }
+  if (m.ctxA) { let f = 0; while ((f = L.indexOf(m.ctxA, f)) >= 0) { cands.push(f); f++; } }
+  if (!cands.length) return null;
+  cands.sort((x, y) => Math.abs(x - near) - Math.abs(y - near));
+  return {start:cands[0], end:cands[0]};
+}
+// 新しい版へ印を運ぶ: 前の本文と新しい本文の行の対応をたどる
+function carryMarks(A, B, v){
+  const rows = alignRows(A, B), map = new Array(A.length), insAfter = new Map();
+  let lastOld = -1;
+  for (const r of rows) {
+    if (r.o != null) { map[r.o] = {j:r.c, how: r.t === "eq" ? "same" : (r.c != null ? "changed" : "removed")}; lastOld = r.o; }
+    else if (r.c != null) (insAfter.get(lastOld) || insAfter.set(lastOld, []).get(lastOld)).push(B[r.c]);
+  }
+  const resolve = o => {
+    if (map[o] && map[o].j != null) return map[o].j;
+    for (let k = o - 1; k >= 0; k--) if (map[k] && map[k].j != null) return map[k].j;
+    for (let k = o + 1; k < A.length; k++) if (map[k] && map[k].j != null) return map[k].j;
+    return 0;
+  };
+  for (const m of cur.marks) {
+    const p = locate(m, A);
+    if (!p) { m.at = null; continue; }
+    const i = resolve(p.i), z = resolve(p.i + p.n - 1);
+    let how = "same";
+    for (let k = p.i; k < p.i + p.n; k++) if (map[k] && map[k].how !== "same") { how = map[k].how === "removed" && how !== "changed" ? "removed" : "changed"; }
+    let start = p.start, end = p.end, rangeLost = false;
+    if (p.start != null && how !== "same") {
+      const r = B[i] != null ? findRange(B[i], m, p.start) : null;
+      if (r) { start = r.start; end = r.end; } else { start = end = null; rangeLost = true; }
+    }
+    if (m.kind === "insert" && m.start == null) {
+      const added = insAfter.get(p.i + p.n - 1) || [];
+      if (added.length) { m.insertedLines = (m.insertedLines || []).concat(added); if (how === "same") how = "changed"; }
+    }
+    m.at = {v, i, n:Math.max(1, z - i + 1), start, end};
+    if (rangeLost) m.rangeLost = true; else if (start != null) delete m.rangeLost;
+    if (how !== "same") { m.touched = {v, how}; (m.touchedHistory ||= []).push({v, how}); }
+  }
+}
+// at のない古い印に今の位置を入れる
+function upgradeMarks(){
+  if (!cur) return;
+  const lines = curLines();
+  for (const m of cur.marks) if (!m.at) { const p = legacyLocate(m, lines); if (p) m.at = {v:cur.currentVersion, i:p.i, n:p.n, start:p.start, end:p.end}; }
+}
+
+// ---------- 見本（保存しない） ----------
+function sampleWork(){
+  const original = ["雨は昼前に上がった。","縁側に出ると、敷石のくぼみにまだ水が残っていた。","妹はしゃがみこんで、その水に映る雲を指でつついている。","「冷たいよ」と私が言うと、妹は顔も上げずに首を振った。","つつくたびに雲は形を崩し、少しすると元に戻った。","私はなんとなく、そのやり取りを最後まで見ていたくなった。"].join("\n");
+  const current = ["雨は昼前に上がった。","縁側に出ると、敷石のくぼみにまだ水が残っていた。","妹はしゃがみこんで、その水に映る雲を指でつついている。","「冷えるよ」と声をかけても、妹は顔を上げずに首を振るだけだった。","つつくたびに雲は形を崩し、少しすると元に戻った。","私はなんとなく、そのやり取りを最後まで見ていたくなった。"].join("\n");
+  const L = linesOf(current), t = nowIso();
+  const mk = (o) => { const m = Object.assign({id:uid("m"), status:"open", concerns:[], directions:[], adds:[], comment:"", createdAt:t, createdVersion:1, type:"既存の文を直す", start:null, end:null}, o); m.at = {v:1, i:m.line, n:m.lineTexts.length, start:m.start, end:m.end}; return m; };
+  const s2 = L[2].indexOf("指で"), s3 = L[3].indexOf("首を");
+  return { id:"sample", sample:true, title:"見本の作業", section:"見本", folder:"", original, current, currentVersion:1, globalComment:"語り手の私は妹より少し年上。説明を足しすぎないでください。", createdAt:t, updatedAt:t,
+    marks:[
+      mk({kind:"fix", line:5, lineTexts:[L[5]], quote:L[5], concerns:["説明くさい・わざとらしい"], directions:["削る・短く"], comment:"気持ちを言い切りすぎている気がする"}),
+      mk({kind:"blank", type:"穴埋め", line:2, lineTexts:[L[2]], start:s2, end:s2+2, quote:"指で", ctxB:L[2].slice(Math.max(0,s2-8), s2), ctxA:L[2].slice(s2+2, s2+10), adds:["動作・しぐさ"], comment:"もう少し子どもらしい触り方に"}),
+      mk({kind:"blank", type:"穴埋め", line:3, lineTexts:[L[3]], start:s3, end:s3, quote:"", ctxB:L[3].slice(Math.max(0,s3-8), s3), ctxA:L[3].slice(s3, s3+8), adds:["動作・しぐさ"], comment:"首を振る前に、ひとつ小さな動きを"}),
+      mk({kind:"insert", type:"新しく入れる", line:4, lineTexts:[L[4]], quote:"", adds:["情景・場の様子"], comment:"雲の動きのあとに、庭の音をひとつ"}),
+    ]};
+}
+function openSample(){
+  cur = sampleWork(); editing = null;
+  versionsCache = [{n:0,text:cur.original,at:cur.createdAt,note:"原文"},{n:1,text:cur.current,at:cur.createdAt,note:"見本の直し"}]; requestsCache = [];
+  baseText = null; baseLabel = "原文"; baseN = null; view = "text"; closeModal(); renderAll();
+}
+
+// ---------- 描画: 本文 ----------
+function renderText(){
+  const m = $("#main");
+  if (!cur) { m.innerHTML = emptyState(); bindEmpty(); return; }
+  if (editing) return renderEditor();
+  const lines = curLines(), A = linesOf(baseText ?? cur.original);
+  const rows = alignRows(A, lines);
+  const nB = lineNumbers(lines), nA = lineNumbers(A);
+  const located = new Map(), inserts = new Map();
+  // 印の窓で書いている新しい印も、本文に描いて場所が分かるようにする
+  const shown = focus && focus.pending ? [...cur.marks, focus.pending] : cur.marks;
+  for (const mk of shown) {
+    if (mk.status !== "open") continue;
+    const p = locate(mk, lines); if (!p) continue;
+    if (mk.kind === "insert" && mk.start == null) { const at = p.i + p.n - 1; (inserts.get(at) || inserts.set(at, []).get(at)).push(mk); continue; }
+    for (let k = 0; k < p.n; k++) { const i = p.i + k; (located.get(i) || located.set(i, []).get(i)).push({mk, p, whole: p.start == null}); }
+  }
+  const order = blankOrder(lines);
+  let html = cur.sample ? `<div class="banner"><span>見本です。印を付けたり書き換えたりして試せますが、保存はされません。自分の作業へは上の「作業を選ぶ」から戻れます。</span></div>` : "";
+  html += draftBanner();
+  if (writeMode) html += `<div class="banner"><span>書くモードです。行をタップすると、その場で直せます。改行キー（完了）か、ほかの所をタップすると保存します。</span></div>`;
+  html += `<div class="toolbar">
+    <div class="seg" role="group" aria-label="表示">
+      <button class="only-wide" data-pane="side" aria-pressed="${pane==="side"}">並べて</button>
+      <button data-pane="work" aria-pressed="${pane==="work"}">作業中</button>
+      <button data-pane="orig" aria-pressed="${pane==="orig"}">${esc(baseLabel)}</button>
+    </div>
+    <label class="hint">比べる相手 <select id="baseSel"></select></label>
+    <button class="btn" id="editAllBtn">本文を書き換える</button>
+  </div>
+  <div class="legend${noDiff || writeMode ? " nodiff" : ""}" style="margin-bottom:8px"><span class="ld"><i style="background:var(--ins)"></i>増えた・変えた</span><span class="ld"><i style="background:var(--del-bg)"></i>消えた</span><span><i style="background:var(--tag)"></i>気になる点</span><span><i style="background:var(--blank-bg)"></i>空欄・入れる</span></div>
+  <p class="hint" style="margin:0 0 10px">行をタップすると選べます。行の中の一部はドラッグ（スマホは長押し）で選べます。${touchUI ? "印をタップすると中身が出て、「開く」で直せます。" : "印にカーソルを合わせると中身が出て、押すと開きます。"}</p>`;
+  html += `<div class="sheet mode-${pane}${noDiff || writeMode ? " nodiff" : ""}${writeMode ? " writing" : ""}"><div class="colhead"><div class="ho">${esc(baseLabel)}</div><div class="hc">作業中</div></div>`;
+  for (const r of rows) {
+    const oT = r.o != null ? A[r.o] : null, cT = r.c != null ? lines[r.c] : null;
+    const fl = r.t === "chg" ? charFlags(oT, cT) : null;
+    const dels = r.t === "chg" && pane === "work" ? deletedRuns(oT, cT) : null;
+    const oHtml = r.o != null ? plainWithFlags(oT, fl ? fl.fa : null, "d") : "";
+    const cMarks = r.c != null ? (located.get(r.c) || []) : [];
+    const cHtml = r.c != null ? workLine(cT, fl ? fl.fb : null, cMarks, order, dels) : "";
+    const isEmpty = (oT ?? "").trim() === "" && (cT ?? "").trim() === "";
+    const blankCls = r.c != null && !cT.trim() ? " blankline" : "";
+    const selCls = r.c != null && sel.lines.has(r.c) ? " sel" : "";
+    const markCls = cMarks.some(x => x.whole) ? " has-mark" : "";
+    const focusCls = focus && cMarks.some(x => x.mk.id === focus.id && (x.whole || x.mk.kind === "blank" || x.p.start == null)) ? " focus" : "";
+    // 行全体の印は、印の頭の行に「印」の札を出し、押すと開く
+    const lineChips = cMarks.filter(x => x.whole && x.p.i === r.c).map(x => `<span class="chip-m${focus && focus.id === x.mk.id ? " focus" : ""}" data-m="${x.mk.id}" title="印を開く">印</span>`).join("");
+    html += `<div class="row ${r.t}${isEmpty ? " empty" : ""}">
+      <div class="cell o"><span class="ln">${r.o != null && nA[r.o] ? nA[r.o] : ""}</span><span class="tx">${oHtml}</span></div>
+      <div class="cell c${blankCls}${selCls}${markCls}${focusCls}"${r.c != null ? ` data-i="${r.c}"` : ""}><span class="ln">${r.c != null && nB[r.c] ? "L" + nB[r.c] : ""}${lineChips}</span><span class="tx">${cHtml}</span></div>
+    </div>`;
+    if (showNotes && r.c != null) {
+      const ends = cMarks.filter(x => x.p.i + x.p.n - 1 === r.c && !(focus && focus.pending && focus.pending.id === x.mk.id));
+      if (ends.length) html += `<div class="row noterow"><div class="cell o"></div><div class="cell c"><span class="ln"></span><span class="tx">${ends.map(x => `<span class="nt" data-m="${x.mk.id}"><b>└</b>${esc(noteLine(x.mk))}</span>`).join("")}</span></div></div>`;
+    }
+    if (r.c != null && inserts.has(r.c)) for (const mk of inserts.get(r.c)) {
+      html += `<div class="row insrow"><div class="cell o"></div><div class="cell c${focus && focus.id === mk.id ? " focus" : ""}"><span class="ln"></span><span class="tx"><span class="chip-b${focus && focus.id === mk.id ? " focus" : ""}" data-m="${mk.id}">${order.get(mk.id) || ""} ここに入れる</span> ${esc([mk.adds.join("／"), mk.comment].filter(Boolean).join(" ・ "))}</span></div></div>`;
+    }
+  }
+  html += `</div>`;
+  m.innerHTML = html;
+  fillBaseSel();
+  bindDraftBanner();
+  m.querySelectorAll("[data-pane]").forEach(b => b.onclick = () => { pane = b.dataset.pane; renderText(); });
+  $("#editAllBtn").onclick = () => startEditAll();
+}
+function plainWithFlags(t, flags, cls){
+  if (!flags) return esc(t);
+  let out = "", run = "", on = false;
+  for (let k = 0; k < t.length; k++) {
+    if (flags[k] !== on) { out += on ? `<span class="${cls}">${esc(run)}</span>` : esc(run); run = ""; on = flags[k]; }
+    run += t[k];
+  }
+  out += on ? `<span class="${cls}">${esc(run)}</span>` : esc(run);
+  return out;
+}
+// 作業中の行: 差分・気になる点・空欄・消えた字を重ねて描く。本文の字を持つ要素には data-s（行の中の開始位置）を付ける
+function workLine(t, flags, marks, order, dels){
+  const bounds = new Set([0, t.length]);
+  const ranges = [], points = new Map();
+  for (const x of marks) {
+    if (x.whole || x.p.start == null) continue;
+    if (x.p.start === x.p.end) { (points.get(x.p.start) || points.set(x.p.start, []).get(x.p.start)).push(x.mk); bounds.add(x.p.start); continue; }
+    ranges.push({s:x.p.start, e:x.p.end, mk:x.mk}); bounds.add(x.p.start); bounds.add(x.p.end);
+  }
+  if (flags) for (let k = 1; k < t.length; k++) if (flags[k] !== flags[k-1]) bounds.add(k);
+  if (dels) for (const k of dels.keys()) bounds.add(Math.min(k, t.length));
+  const b = [...bounds].sort((x,y)=>x-y);
+  let out = "", shownBlank = new Set();
+  const fc = mk => focus && focus.id === mk.id ? " focus" : "";
+  const extras = s => {
+    let h = "";
+    if (dels && dels.has(s) && !ranges.some(r => r.mk.kind === "blank" && r.s < s && s < r.e)) h += `<span class="dx" contenteditable="false">${esc(dels.get(s))}</span>`;
+    for (const mk of (points.get(s) || [])) h += `<span class="chip-b${fc(mk)}" contenteditable="false" data-m="${mk.id}" title="ここに入れる">${order.get(mk.id) || "入れる"}</span>`;
+    return h;
+  };
+  for (let q = 0; q < b.length - 1; q++) {
+    const s = b[q], e = b[q+1]; if (e <= s) continue;
+    out += extras(s);
+    const blank = ranges.find(r => r.mk.kind === "blank" && r.s <= s && e <= r.e);
+    if (blank) { if (!shownBlank.has(blank.mk.id)) { shownBlank.add(blank.mk.id); out += `<span class="chip-b${fc(blank.mk)}" contenteditable="false" data-m="${blank.mk.id}" title="元の語: ${esc(blank.mk.quote)}">${order.get(blank.mk.id) || "空欄"}</span>`; } continue; }
+    const fix = ranges.find(r => r.mk.kind === "fix" && r.s <= s && e <= r.e);
+    const ins = flags ? flags[s] : false;
+    let span = `<span data-s="${s}"${ins ? ' class="a"' : ""}>${esc(t.slice(s, e))}</span>`;
+    if (fix) span = `<mark class="m${fc(fix.mk)}" data-m="${fix.mk.id}">${span}</mark>`;
+    out += span;
+  }
+  out += extras(t.length);
+  if (!t.length) out = `<span data-s="0"></span>` + out;
+  return out;
+}
+function blankOrder(lines){
+  const items = [];
+  for (const mk of cur.marks) {
+    if (mk.status !== "open" || (mk.kind !== "blank" && mk.kind !== "insert")) continue;
+    const p = locate(mk, lines); if (!p) continue;
+    const lineInsert = mk.kind === "insert" && mk.start == null;
+    items.push({mk, key: lineInsert ? (p.i + p.n - 1) * 100000 + 99999 : p.i * 100000 + (p.start ?? 0)});
+  }
+  items.sort((a,b)=>a.key-b.key);
+  const map = new Map(); items.forEach((x,k)=>map.set(x.mk.id, circ(k+1)));
+  return map;
+}
+async function fillBaseSel(){
+  const s = $("#baseSel"); if (!s) return;
+  const vs = await getVersions();
+  s.innerHTML = `<option value="orig">原文</option>` + vs.filter(v => v.n > 0).sort((a, b) => b.at.localeCompare(a.at)).map(v => `<option value="${v.n}">${esc(verTitle(v))}</option>`).join("");
+  s.value = baseN == null ? "orig" : String(baseN);
+  s.onchange = () => {
+    if (s.value === "orig") setBase(null);
+    else setBase(vs.find(x => String(x.n) === s.value));
+    renderText();
+  };
+}
+
+function emptyState(){
+  return `<div class="sheet"><div class="emptystate">
+    <h2>原稿を一つ、机に置きましょう</h2>
+    <p>原文を貼り付けると、作業中の本文と並べて見比べながら、気になる行に印を付けられます。印はAIへの依頼の形にまとめてコピーでき、どこをどう直したかは自動で記録に残ります。</p>
+    <div class="row2"><button class="btn primary" id="esNew">新しい作業を始める</button><button class="btn" id="esSample">見本で試す</button></div>
+  </div></div>`;
+}
+function bindEmpty(){ $("#esNew").onclick = () => openNewWork(); $("#esSample").onclick = openSample; }
+
+// ---------- 本文をまるごと書き換える ----------
+const draftKey = () => cur ? `kaikou.draft.edit.${cur.id}` : null;
+function startEditAll(){ editing = {text: cur.current}; clearSel(); renderText(); renderFab(); }
+function renderEditor(){
+  const m = $("#main");
+  m.innerHTML = `<div class="editor">
+    <div class="banner"><span>本文をそのまま書き換えられます。「保存」で本文に反映され、印は行の対応をたどって付いてきます。版として残したいときは、本文タブの右下の保存ボタンを押してください。書きかけはこの端末に自動で残ります。</span></div>
+    <textarea id="editAll" aria-label="作業中の本文">${esc(editing.text)}</textarea>
+    <div class="row2"><span style="flex:1"></span><button class="btn ghost" id="editCancel">やめる</button><button class="btn primary" id="editSave">保存</button></div>
+  </div>`;
+  const ta = $("#editAll"); let t = null;
+  ta.oninput = () => { editing.text = ta.value; clearTimeout(t); t = setTimeout(() => { if (!cur.sample) ls.set(draftKey(), {mode:"all", baseVersion:cur.currentVersion, text:ta.value, at:nowIso()}); }, 400); };
+  $("#editCancel").onclick = () => {
+    const b = $("#editCancel");
+    if (ta.value !== cur.current && !b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "書き換えを捨ててやめる"; return; }
+    editing = null; ls.del(draftKey()); renderText();
+  };
+  $("#editSave").onclick = async () => {
+    const text = ta.value.replace(/\r\n?/g, "\n");
+    if (text === cur.current) { toast("本文が変わっていません"); return; }
+    const before = cur.current;
+    try {
+      await setBody(text, "本文を書き換え", "edit");
+      editing = null; ls.del(draftKey()); bump("edits"); renderText(); savedToast();
+      praiseForEdit(before, text);
+    } catch (e) { toast("保存できませんでした: " + errText(e)); }
+  };
+}
+// 書きかけ（端末に残したもの）の案内
+function draftBanner(){
+  if (!cur || cur.sample) return "";
+  const d = ls.get(draftKey(), null);
+  if (!d || !d.text) return "";
+  if (d.baseVersion === cur.currentVersion) return `<div class="banner"><span>書きかけの書き換えがあります（${fmtTime(d.at)}）。</span><button class="btn small primary" id="draftResume">続ける</button><button class="btn small ghost" id="draftDrop">捨てる</button></div>`;
+  return `<div class="banner"><span>書きかけが残っていますが、そのあとに本文が変わったので、そのままは使えません。</span><button class="btn small" id="draftShow">中身を見る</button><button class="btn small ghost" id="draftDrop">捨てる</button></div>`;
+}
+function bindDraftBanner(){
+  const d = cur && ls.get(draftKey(), null);
+  const r = $("#draftResume"), x = $("#draftDrop"), s = $("#draftShow");
+  if (r) r.onclick = () => {
+    if (d.mode === "lines") openLineEditor(d.a, d.z, d.text);
+    else { editing = {text: d.text}; renderText(); }
+  };
+  if (x) x.onclick = () => { if (!x.dataset.armed) { x.dataset.armed = "1"; x.textContent = "もう一度押すと捨てます"; return; } ls.del(draftKey()); renderText(); };
+  if (s) s.onclick = () => { showModal(`<h2>書きかけの中身</h2><p class="hint" style="margin:0">必要なところをコピーして使ってください。</p><pre class="out">${esc(d.text)}</pre><div class="dfoot"><button class="btn" id="mClose">閉じる</button></div>`); $("#mClose").onclick = closeModal; };
+}
+
+// ---------- 選ぶ ----------
+const mainEl = $("#main");
+mainEl.addEventListener("click", e => {
+  if (view !== "text" || !cur || editing || $("#modal").innerHTML) return;
+  if (e.target.closest("textarea.inl")) return;
+  // その場の書き換えを保存した直後のタップ: 行の数が変わった分をずらしてから描き直す
+  const cell0 = e.target.closest(".cell.c[data-i]");
+  let ti = cell0 ? +cell0.dataset.i : null;
+  const off = cell0 && writeMode ? caretOffset(e, cell0) : null;
+  if (inlineShift) {
+    if (ti != null && ti > inlineShift.at) ti += inlineShift.delta;
+    flushInlineRender();
+    if (!writeMode) return;
+  }
+  if (writeMode) { if (ti != null) startInline(ti, off); return; }
+  const mEl = e.target.closest("[data-m]");
+  // スマホ: 1回目のタップで吹き出し、吹き出しの「開く」で印の窓
+  if (touchUI) {
+    if (peekEl()) { const same = mEl && peekEl().dataset.m === mEl.dataset.m; closePeek(); if (same || !mEl) return; }
+    if (mEl) { showPeek(mEl, true); return; }
+  }
+  if (mEl) { closePeek(); openMarkEditor(cur.marks.find(x => x.id === mEl.dataset.m)); return; }
+  const cell = e.target.closest(".cell.c[data-i]"); if (!cell) return;
+  const s = window.getSelection();
+  if (s && !s.isCollapsed && mainEl.contains(s.anchorNode)) return;
+  const i = +cell.dataset.i;
+  if (!curLines()[i].trim()) return;
+  if (sel.lines.has(i)) sel.lines.delete(i); else sel.lines.add(i);
+  sel.range = null;
+  cell.classList.toggle("sel", sel.lines.has(i));
+  renderBar();
+});
+function cellOf(node){ const el = node && (node.nodeType === 3 ? node.parentElement : node); return el && el.closest ? el.closest(".cell.c[data-i]") : null; }
+function posOf(node, off){
+  if (node.nodeType !== 3) { const el = node.childNodes[off] || node; const sp = el.closest ? el.closest("[data-s]") : null; return sp ? +sp.dataset.s : null; }
+  const sp = node.parentElement.closest("[data-s]"); return sp ? +sp.dataset.s + off : null;
+}
+let selT = null;
+document.addEventListener("selectionchange", () => { clearTimeout(selT); selT = setTimeout(readRange, 160); });
+function readRange(){
+  if (view !== "text" || !cur || editing || writeMode || inline || $("#modal").innerHTML) return;
+  const s = window.getSelection();
+  if (!s || s.isCollapsed || !s.rangeCount) { if (sel.range) { sel.range = null; renderBar(); } return; }
+  const ca = cellOf(s.anchorNode), cf = cellOf(s.focusNode);
+  if (!ca || ca !== cf) { if (sel.range) { sel.range = null; renderBar(); } return; }
+  const i = +ca.dataset.i, p1 = posOf(s.anchorNode, s.anchorOffset), p2 = posOf(s.focusNode, s.focusOffset);
+  if (p1 == null || p2 == null) return;
+  const start = Math.min(p1, p2), end = Math.max(p1, p2);
+  const L = curLines()[i];
+  if (end <= start || !L.slice(start, end).trim()) return;
+  sel.range = {i, start, end, quote: L.slice(start, end)};
+  renderBar();
+}
+function clearSel(){ sel.lines.clear(); sel.range = null; try { window.getSelection().removeAllRanges(); } catch {} document.querySelectorAll(".cell.sel").forEach(c => c.classList.remove("sel")); renderBar(); }
+
+function renderBar(){
+  const bar = $("#bar");
+  setTimeout(() => document.documentElement.style.setProperty("--barh", (bar.firstElementChild ? bar.firstElementChild.offsetHeight : 0) + "px"), 0);
+  if (view !== "text" || !cur || editing || writeMode || inline || (!sel.range && !sel.lines.size)) { bar.innerHTML = ""; placePraise(); return; }
+  const lines = curLines(), nB = lineNumbers(lines);
+  let what, btns;
+  if (sel.range) {
+    what = `L${nB[sel.range.i] ?? "?"}「${esc(sel.range.quote)}」を選んでいます`;
+    btns = `<button class="btn primary" data-act="fix">気になる点</button><button class="btn" data-act="blank">空欄にする</button><button class="btn" data-act="insBefore">この前に入れる</button><button class="btn" data-act="insAfter">この後に入れる</button>`;
+  } else {
+    const idx = [...sel.lines].sort((a,b)=>a-b);
+    what = idx.map(i => "L" + (nB[i] ?? "?")).join("・") + " を選んでいます";
+    btns = `<button class="btn primary" data-act="fix">気になる点</button><button class="btn" data-act="insert">この行の後に入れる</button>${idx.length >= 2 ? `<button class="btn" data-act="merge">一文にまとめる</button>` : ""}<button class="btn" data-act="rewrite">書き換える</button>`;
+    // 選んだ行に付いている印（未対応）を開くボタン
+    const onSel = cur.marks.filter(m => { if (m.status !== "open") return false; const p = locate(m, lines); return p && idx.some(i => i >= p.i && i < p.i + p.n); });
+    btns += onSel.slice(0, 3).map((m, k) => `<button class="btn" data-openm="${m.id}">印を開く${onSel.length > 1 ? k + 1 : ""}<span class="hint">（${esc(markLabel(m))}）</span></button>`).join("");
+  }
+  bar.innerHTML = `<div class="actionbar"><div class="in"><span class="what">${what}</span>${btns}<button class="btn ghost" data-act="clear">選ぶのをやめる</button></div></div>`;
+  bar.querySelectorAll("[data-act]").forEach(b => b.onclick = () => startMark(b.dataset.act));
+  bar.querySelectorAll("[data-openm]").forEach(b => b.onclick = () => openMarkEditor(cur.marks.find(x => x.id === b.dataset.openm)));
+  placePraise();
+}
+function startMark(act){
+  if (act === "clear") return clearSel();
+  const lines = curLines();
+  if (act === "rewrite") { const idx = [...sel.lines].sort((a,b)=>a-b); return openLineEditor(idx[0], idx[idx.length-1]); }
+  let mk;
+  const base = {id:uid("m"), status:"open", concerns:[], directions:[], adds:[], comment:"", createdAt:nowIso(), createdVersion:cur.currentVersion, start:null, end:null, isNew:true};
+  if (sel.range) {
+    const r = sel.range, L = lines[r.i];
+    if (act === "insBefore" || act === "insAfter") {
+      const pos = act === "insBefore" ? r.start : r.end;
+      mk = Object.assign(base, {kind:"blank", type:"穴埋め", line:r.i, lineTexts:[L], start:pos, end:pos, quote:"", ctxB:L.slice(Math.max(0, pos - 8), pos), ctxA:L.slice(pos, pos + 8)});
+    } else {
+      mk = Object.assign(base, {line:r.i, lineTexts:[L], start:r.start, end:r.end, quote:r.quote, kind: act === "blank" ? "blank" : "fix", type: act === "blank" ? "穴埋め" : "既存の文を直す", ctxB:L.slice(Math.max(0, r.start - 8), r.start), ctxA:L.slice(r.end, r.end + 8)});
+    }
+  } else {
+    const idx = [...sel.lines].filter(i => lines[i].trim()).sort((a,b)=>a-b);
+    if (!idx.length) return;
+    const a = idx[0], z = idx[idx.length-1];
+    const lt = lines.slice(a, z + 1);
+    if (act === "insert") mk = Object.assign(base, {kind:"insert", type:"新しく入れる", line:z, lineTexts:[lines[z]], quote:""});
+    else mk = Object.assign(base, {kind:"fix", type: act === "merge" ? "一文にまとめる" : "既存の文を直す", line:a, lineTexts:lt, quote:qt(lt.join("\n")), directions: act === "merge" ? ["一文にまとめる"] : []});
+  }
+  mk.at = {v:cur.currentVersion, i:mk.line, n:mk.lineTexts.length, start:mk.start, end:mk.end};
+  openMarkEditor(mk);
+}
+
+// ---------- 印の入力（札はその場で切り替え、窓は作り直さない） ----------
+function markWhere(d, lines, nB){
+  const p = locate(d, lines);
+  if (!p) return "（今の本文では場所が見つかりません）";
+  if (d.kind === "insert" && d.start == null) return `L${nB[p.i+p.n-1] ?? "?"} の後`;
+  if (d.kind === "blank" && p.start != null && p.start === p.end) return `L${nB[p.i] ?? "?"} の文中`;
+  return p.n > 1 ? `L${nB[p.i]}～L${nB[p.i+p.n-1]}` : `L${nB[p.i] ?? "?"}`;
+}
+function openMarkEditor(mk){
+  if (!mk) return;
+  const d = clone(mk);
+  const lines = curLines(), nB = lineNumbers(lines), p = locate(d, lines);
+  const inline = d.kind === "blank" && d.start != null && d.start === d.end;
+  const title = inline ? "ここに入れたいもの" : d.kind === "blank" ? "空欄に入れたいもの" : d.kind === "insert" ? "ここに入れたいもの" : "気になる点";
+  const chipGroup = (label, key, list, max) => `<div class="group"><span class="gl">${label}（${max}つまで${key === "concerns" ? "、最初に選んだものが中心" : ""}）</span><div class="chips" data-key="${key}" data-max="${max}">${list.map(v => `<button type="button" aria-pressed="false" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div><div class="chipnote" data-note="${key}" hidden></div></div>`;
+  let body = `<h2>${title} <span class="where">${markWhere(d, lines, nB)}</span></h2>`;
+  if (d.touched && d.status === "open") body += `<p class="lost" style="margin:0;color:var(--ins-line)">${d.touched.how === "removed" ? "書き換えでこの行は消えました。" : "書き換えでこの行は直されました。"}</p>`;
+  if (d.rangeLost) body += `<p class="lost" style="margin:0">元の語が見つからないので、行全体に付けています。</p>`;
+  if (d.kind === "insert" && d.start == null) body += `<div class="dq">${esc(p ? lines[p.i+p.n-1] : d.lineTexts[0])}<br><span class="caret">↓ ここに新しい文を入れる</span></div>`;
+  else if (inline) { const L = p ? lines[p.i] : d.lineTexts[0], at = p && p.start != null ? p.start : d.start; body += `<div class="dq">${esc(L.slice(0, at))}<span class="caret">｜ここ｜</span>${esc(L.slice(at))}</div>`; }
+  else if (d.kind === "blank") body += `<div class="dq">空欄にする語: 「${esc(d.quote)}」<br><span class="hint">依頼には空欄の番号だけを出し、この語は出しません。</span></div>`;
+  else body += `<div class="dq">${esc(p ? (p.start != null ? lines[p.i].slice(p.start, p.end) : qt(lines.slice(p.i, p.i + p.n).join("\n"))) : d.quote)}</div>`;
+  body += `<p class="hint" style="margin:0">分類を押すと、選び方の説明と例が出ます。</p>`;
+  if (d.kind === "fix") body += `<div class="group"><span class="gl">依頼の種類</span><div class="chips" data-key="type" data-max="1">${FIX_TYPES.map(v => `<button type="button" aria-pressed="false" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div><div class="chipnote" data-note="type" hidden></div></div>` + chipGroup("気になる点", "concerns", CONCERNS, 3) + chipGroup("どう直したいか", "directions", DIRECTIONS, 2);
+  else body += chipGroup("入れたいもの", "adds", ADDS, 2);
+  body += `<div class="picked" id="mkPicked" aria-label="選んだ分類"></div>`;
+  body += `<label class="fld" for="mkComment">コメント（自由に。使ってほしくない語などもここに）<textarea id="mkComment" rows="3">${esc(d.comment)}</textarea></label>`;
+  // 本文をこの窓で直す（印の行を書き換える。行の後に入れる印は、入れる文を書く）
+  const lineIns = d.kind === "insert" && d.start == null;
+  const editOrig = p ? (lineIns ? "" : lines.slice(p.i, p.i + p.n).join("\n")) : null;
+  if (p && d.status === "open") body += `<details class="editbox" id="mkEditBox"><summary>本文をここで直す</summary><div class="stack" style="gap:8px;margin-top:8px">
+    <textarea id="mkText" class="body" rows="${Math.min(6, Math.max(2, p.n + 1))}" aria-label="直した本文">${esc(editOrig)}</textarea>
+    <div class="row2"><span class="hint" style="flex:1 1 200px">${lineIns ? "この行の後に入れる文を書いてください。" : "印の行を書き換えられます。行を増やしたり減らしたりしてもかまいません。"}保存すると本文に反映されます。</span><button type="button" class="btn small" id="mkTextReset">${lineIns ? "書いた文を消す" : "元の文に戻す"}</button></div>
+    <label class="switch" for="mkEditDone"><input type="checkbox" id="mkEditDone" checked>直したら、この印を済みにする</label></div></details>`;
+  body += `<div class="dfoot">${d.isNew ? "" : `<button class="btn danger left" id="mkDel">印を削除</button>`}${!d.isNew && d.status === "open" ? `<button class="btn${d.touched ? " primary" : ""}" id="mkDone">済みにする</button>` : ""}<button class="btn ghost" id="mkCancel">閉じる</button><button class="btn primary" id="mkSave">${d.isNew ? "印を付ける" : "保存"}</button></div>`;
+  closePeek();
+  showModal(body, {half:true});
+  // 窓を開いている間、本文のほうでもこの印の場所を目立たせる（新しい印はまだ付いていないので、仮に描く）
+  focus = {id:d.id, pending: d.isNew ? d : null};
+  if (view === "text") renderText();
+  const tr = $("#mkTextReset"); if (tr) tr.onclick = () => { const ta = $("#mkText"); ta.value = editOrig; ta.focus(); };
+  // スマホでは、印の行が上半分に見えるように本文を動かす
+  // キーボードが出ているときは、見えている範囲の上端（見出しが隠れていればそこ）に合わせる
+  const showLine = () => {
+    const cell = document.querySelector(`.cell.c[data-i="${p.i}"]`), hd = document.querySelector("header.top");
+    if (!cell || !hd) return;
+    const vt = window.visualViewport ? window.visualViewport.offsetTop : 0;
+    const want = Math.max(hd.getBoundingClientRect().bottom, vt) + 12;
+    window.scrollTo({top: window.scrollY + cell.getBoundingClientRect().top - want});
+  };
+  const phone = view === "text" && p && window.matchMedia("(max-width:760px)").matches;
+  if (phone) {
+    setTimeout(showLine, 30);
+    // キーボードの出入りで見えている範囲が変わり終えたら、もう一度印の行へ合わせる
+    let t = null;
+    onViewportChange = () => { clearTimeout(t); t = setTimeout(showLine, 120); };
+    ["#mkComment", "#mkText"].forEach(s => { const el = $(s); if (el) el.addEventListener("focus", () => setTimeout(showLine, 400)); });
+  }
+  // 入力中に見せる「選んだ分類」
+  const showPicked = () => {
+    const vals = d.kind === "fix" ? [d.type, ...d.concerns, ...d.directions] : [...d.adds];
+    $("#mkPicked").innerHTML = (vals.length ? vals.map(v => `<span>${esc(v)}</span>`).join("") : `<span class="none">分類は選んでいません</span>`) + `<button type="button" class="btn small" id="mkRepick">選び直す</button>`;
+    $("#mkRepick").onclick = () => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); $("#scrim").classList.remove("typing"); };
+  };
+  showPicked();
+  const showNote = (key, v) => {
+    const n = document.querySelector(`.dialog .chipnote[data-note="${key}"]`), t = (NOTES[key] || {})[v];
+    if (!n || !t) return;
+    n.innerHTML = `<b>${esc(v)}</b>：${esc(t)}`; n.hidden = false;
+  };
+  const refresh = g => {
+    const key = g.dataset.key, vals = key === "type" ? [d.type] : d[key];
+    g.querySelectorAll("button[data-v]").forEach(b => {
+      const k = vals.indexOf(b.dataset.v);
+      b.setAttribute("aria-pressed", String(k >= 0));
+      const old = b.querySelector(".ord"); if (old) old.remove();
+      if (k >= 0 && key === "concerns") { const o = document.createElement("span"); o.className = "ord"; o.textContent = k + 1; b.appendChild(o); }
+    });
+  };
+  document.querySelectorAll(".dialog .chips").forEach(g => {
+    refresh(g);
+    g.addEventListener("click", e => {
+      const b = e.target.closest("button[data-v]"); if (!b) return;
+      const key = g.dataset.key, max = +g.dataset.max, v = b.dataset.v;
+      if (key === "type") {
+        d.type = v;
+        if (v === "一文にまとめる" && !d.directions.includes("一文にまとめる")) { d.directions = ["一文にまとめる", ...d.directions].slice(0,2); const dg = document.querySelector('.dialog .chips[data-key="directions"]'); if (dg) refresh(dg); }
+      } else { const k = d[key].indexOf(v); if (k >= 0) d[key].splice(k, 1); else if (d[key].length < max) d[key].push(v); else { d[key].shift(); d[key].push(v); } }
+      refresh(g);
+      showNote(key, v);
+      showPicked();
+    });
+  });
+  const save = () => {
+    d.comment = $("#mkComment").value.trim();
+    const wasNew = d.isNew; delete d.isNew; d.updatedAt = nowIso();
+    const k = cur.marks.findIndex(x => x.id === d.id);
+    if (k >= 0) cur.marks[k] = d; else cur.marks.push(d);
+    return wasNew;
+  };
+  // 窓で直した本文を新しい版にする（直していなければ何もしない）
+  const applyEdit = async () => {
+    const ta = $("#mkText"); if (!ta || !p) return false;
+    const nw = ta.value.replace(/\r\n?/g, "\n");
+    if (nw === editOrig || (lineIns && !nw.trim())) return false;
+    const L = curLines(), z = p.i + p.n - 1;
+    const next = lineIns ? [...L.slice(0, z + 1), ...nw.split("\n"), ...L.slice(z + 1)] : [...L.slice(0, p.i), ...nw.split("\n"), ...L.slice(z + 1)];
+    const at = lineIns ? `L${nB[z] ?? "?"}の後に入れた` : `L${nB[p.i] ?? "?"}${p.n > 1 ? "～L" + (nB[z] ?? "?") : ""}を印の窓で直した`;
+    await setBody(next.join("\n"), at, "edit");
+    bump("edits");
+    return true;
+  };
+  const finish = async forceDone => {
+    const wantDone = forceDone || !!($("#mkEditDone") && $("#mkEditDone").checked);
+    document.querySelectorAll(".dialog .dfoot button").forEach(b => b.disabled = true);
+    const wasNew = save();
+    let edited = false;
+    try { edited = await applyEdit(); } catch (e) { toast("本文を保存できませんでした: " + errText(e)); }
+    focus = null; closeModal(); if (wasNew) { clearSel(); bump("marks"); }
+    const m = cur.marks.find(x => x.id === d.id);
+    if (forceDone || (edited && wantDone)) {
+      if (!edited) { doneMarks([m]); return; }
+      doneMarks([m], {quiet:true}); renderView(); savedToast(); praiseForMarks([m]); return;
+    }
+    scheduleSave(); renderView();
+    if (edited) savedToast(); else toast(wasNew ? "印を付けました" : "保存しました");
+  };
+  $("#mkCancel").onclick = closeModal;
+  $("#mkSave").onclick = () => finish(false);
+  const dn = $("#mkDone"); if (dn) dn.onclick = () => finish(true);
+  if (!d.isNew) $("#mkDel").onclick = () => {
+    const btn = $("#mkDel");
+    if (btn.dataset.armed) { focus = null; closeModal(); deleteMark(d.id); }
+    else { btn.dataset.armed = "1"; btn.textContent = "もう一度押すと削除します"; }
+  };
+}
+// 窓: 外を押して閉じるのは、押し始めも外だったときだけ。文を書く窓（lock）は外を押しても閉じない
+let scrimDown = false;
+// half: スマホでは下半分だけの窓にし、上の本文を見たり動かしたりできるようにする（外を押しても閉じない）
+function showModal(inner, opts = {}){
+  fitViewport(); onViewportChange = null;
+  const fresh = !$("#modal").innerHTML;
+  $("#modal").innerHTML = `<div class="scrim${opts.half ? " half" : ""}" id="scrim"><div class="dialog${fresh ? " rise" : ""}" role="dialog" aria-modal="true">${inner}</div></div>`;
+  const sc = $("#scrim");
+  sc.dataset.lock = opts.lock ? "1" : "";
+  document.body.classList.toggle("sheet-open", !!opts.half);
+  sc.addEventListener("pointerdown", e => { scrimDown = e.target === sc; });
+  sc.addEventListener("click", e => { if (e.target === sc && scrimDown && !opts.lock && !opts.half) closeModal(); scrimDown = false; });
+  // 文字を入れている間は窓を広げる
+  sc.addEventListener("focusin", e => { if (e.target.matches("textarea, input[type=text]")) sc.classList.add("typing"); });
+  // ボタンを押した瞬間に形が変わって押し損なわないよう、戻すのは少し待ってから
+  sc.addEventListener("focusout", () => setTimeout(() => { const a = document.activeElement; if (!a || !a.matches || !a.matches("textarea, input[type=text]")) sc.classList.remove("typing"); }, 250));
+}
+function closeModal(){
+  $("#modal").innerHTML = ""; document.body.classList.remove("sheet-open"); onViewportChange = null;
+  if (focus) { focus = null; if (view === "text" && cur && !editing) renderText(); }
+}
+// 印を消す（消した印は「元に戻す」で一度だけ戻せる）
+function deleteMark(id){
+  const k = cur.marks.findIndex(x => x.id === id); if (k < 0) return;
+  const [gone] = cur.marks.splice(k, 1), wid = cur.id;
+  scheduleSave(); renderView();
+  toast("印を削除しました", {label:"元に戻す", fn: () => { if (cur && cur.id === wid && !cur.marks.some(x => x.id === gone.id)) { cur.marks.splice(Math.min(k, cur.marks.length), 0, gone); scheduleSave(); renderView(); toast("印を戻しました"); } }});
+}
+let onViewportChange = null;   // 印の窓が開いている間だけ、見えている範囲が変わったら呼ぶ
+// キーボードが出たときに、窓が見えている範囲に収まるようにする
+// 開いた直後などに高さが0と報告されることがあるので、小さすぎる値は使わず画面いっぱいに戻す
+function fitViewport(){
+  const vv = window.visualViewport, r = document.documentElement.style;
+  if (!vv || vv.height < 120) { r.removeProperty("--vvh"); r.removeProperty("--vvt"); return; }
+  r.setProperty("--vvh", vv.height + "px"); r.setProperty("--vvt", vv.offsetTop + "px");
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () => { fitViewport(); if (onViewportChange) onViewportChange(); });
+  window.visualViewport.addEventListener("scroll", fitViewport);
+}
+window.addEventListener("resize", fitViewport);
+fitViewport();
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#modal").innerHTML && !$("#scrim").dataset.lock) closeModal(); });
+
+// ---------- その場で書き換える（書くモード・PCのダブルクリック） ----------
+// 1行ずつ、行の位置のまま入力欄に変える。改行キー（スマホは「完了」）か、入力欄から離れたときに保存する。
+// iPhone は入力欄の外をタップしてもキーボードが閉じないので、外へのタップでこちらから入力欄を離れさせる。
+// 行を分けたいときは、PC は Shift+Enter、スマホは行を選んで「書き換える」。
+// 保存してすぐ描き直すと、ほかの行へのタップが消えた要素に当たって届かないので、少し待ってから描き直す
+let inlineShift = null, inlineTimer = null;   // 保存した行と、増えた行の数（その間のタップの行をずらす）
+function flushInlineRender(){ clearTimeout(inlineTimer); inlineShift = null; renderText(); renderFab(); }
+// タップした位置が行の何文字目か（入力欄のカーソルをそこへ置く）
+function caretOffset(e, cell){
+  try {
+    let node = null, o = 0;
+    if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(e.clientX, e.clientY); if (r) { node = r.startContainer; o = r.startOffset; } }
+    else if (document.caretPositionFromPoint) { const r = document.caretPositionFromPoint(e.clientX, e.clientY); if (r) { node = r.offsetNode; o = r.offset; } }
+    if (!node || !cell.contains(node)) return null;
+    return posOf(node, o);
+  } catch { return null; }
+}
+// スマホは16px未満の入力欄に触れると画面ごと拡大するので、入力欄の字は16pxにして、見た目だけ本文の大きさへ縮める
+function inlineScale(){ return touchUI && txt.fs < 16 ? txt.fs / 16 : 1; }
+function autosize(ta){
+  const k = inlineScale();
+  ta.style.height = "auto";
+  const h = ta.scrollHeight;
+  ta.style.height = h + "px";
+  ta.style.marginBottom = k < 1 ? `${-h * (1 - k)}px` : "";
+}
+function startInline(i, off){
+  if (inline) return;
+  const lines = curLines(); if (i < 0 || i >= lines.length) return;
+  const cell = mainEl.querySelector(`.cell.c[data-i="${i}"]`); if (!cell) return;
+  clearSel(); closePeek();
+  const tx = cell.querySelector(".tx"), ta = document.createElement("textarea");
+  ta.className = "inl"; ta.rows = 1; ta.value = lines[i]; ta.setAttribute("aria-label", "この行を書き換える"); ta.setAttribute("enterkeyhint", "done");
+  tx.replaceChildren(ta); cell.classList.add("editing"); document.body.classList.add("inline-on");
+  inline = {i, orig: lines[i], ta};
+  const k = inlineScale();
+  if (k < 1) Object.assign(ta.style, {fontSize: "16px", width: `${100 / k}%`, transform: `scale(${k})`, transformOrigin: "0 0"});
+  else if (touchUI) ta.style.fontSize = "var(--fs-text)";
+  autosize(ta);
+  ta.focus({preventScroll: true});
+  const p = off == null ? ta.value.length : Math.min(off, ta.value.length);
+  try { ta.setSelectionRange(p, p); } catch {}
+  ta.addEventListener("input", () => autosize(ta));
+  ta.addEventListener("blur", () => { if (inline && inline.ta === ta) endInline(true); });
+  // 変換を確定する改行キーで保存してしまわないように（Safari は確定の直後に変換中でない Enter を送ることがある）
+  let compEnd = 0;
+  ta.addEventListener("compositionend", () => { compEnd = Date.now(); });
+  ta.addEventListener("keydown", e => {
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === "Escape") { e.preventDefault(); endInline(false); }
+    else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (Date.now() - compEnd > 80) ta.blur(); }
+  });
+}
+function endInline(save){
+  const s = inline; if (!s) return;
+  inline = null; document.body.classList.remove("inline-on");
+  const nw = s.ta.value.replace(/\r\n?/g, "\n");
+  let delta = 0;
+  if (save && nw !== s.orig) {
+    const L = curLines(), parts = nw.split("\n"), nB = lineNumbers(L);
+    const no = nB[s.i] ?? nB.slice(s.i).find(x => x);
+    delta = parts.length - 1;
+    setBody([...L.slice(0, s.i), ...parts, ...L.slice(s.i + 1)].join("\n"), no ? `L${no}を書き換え` : "空行に書き足し", "edit");
+    bump("edits"); savedToast(); praiseForEdit(s.orig, nw);
+  }
+  inlineShift = {at: s.i, delta};
+  clearTimeout(inlineTimer); inlineTimer = setTimeout(flushInlineRender, save ? 350 : 0);
+}
+function setWriteMode(on){
+  if (inline) endInline(true);
+  writeMode = on; clearSel(); closePeek();
+  if (inlineShift) flushInlineRender(); else { renderText(); renderFab(); }
+  toast(on ? "書くモード: 行をタップすると、その場で直せます" : "書くモードを終えました");
+}
+// 入力欄の外に触れたら入力を終える（iPhone はそれだけではキーボードを閉じないため）
+document.addEventListener("pointerdown", e => { if (inline && !inline.ta.contains(e.target)) inline.ta.blur(); }, true);
+// PC: ダブルクリックした行を、その場で書き換える（書くモードでなくても）
+mainEl.addEventListener("dblclick", e => {
+  if (touchUI || writeMode || inline || view !== "text" || !cur || editing || $("#modal").innerHTML) return;
+  if (e.target.closest("[data-m]")) return;
+  const cell = e.target.closest(".cell.c[data-i]"); if (!cell) return;
+  const off = caretOffset(e, cell);
+  try { window.getSelection().removeAllRanges(); } catch {}
+  startInline(+cell.dataset.i, off);
+});
+
+// ---------- 行を選んで書き換える ----------
+function openLineEditor(a, z, draftText){
+  const lines = curLines(), nB = lineNumbers(lines);
+  const orig = lines.slice(a, z + 1).join("\n");
+  const text = draftText ?? orig;
+  const onLines = cur.marks.filter(m => { if (m.status !== "open") return false; const p = locate(m, lines); return p && p.i <= z && p.i + p.n - 1 >= a; });
+  const nb = i => nB[i] ?? nB.slice(i).find(x => x) ?? "?";
+  showModal(`<h2>書き換える <span class="where">L${nb(a)}${z > a ? "～L" + nb(z) : ""}</span></h2>
+    <textarea id="leText" class="body" style="min-height:160px">${esc(text)}</textarea>
+    <div class="row2"><span class="hint" style="flex:1 1 200px">行を増やしたり減らしたりしてかまいません。保存すると本文に反映されます。</span><button type="button" class="btn small" id="leReset">元の文に戻す</button></div>
+    ${onLines.length ? `<div class="checks"><span class="hint">この範囲の印</span>${onLines.map(m => `<label><input type="checkbox" data-done="${m.id}" checked><span>${esc(markLabel(m))}：${esc(markGist(m))}　を済みにする</span></label>`).join("")}</div>` : ""}
+    <div class="dfoot"><button class="btn ghost" id="leCancel">閉じる</button><button class="btn primary" id="leSave">保存</button></div>`, {lock:true});
+  const ta = $("#leText"); ta.focus();
+  $("#leReset").onclick = () => { ta.value = orig; ta.dispatchEvent(new Event("input")); ta.focus(); };
+  let t = null;
+  ta.oninput = () => { clearTimeout(t); t = setTimeout(() => { if (!cur.sample) ls.set(draftKey(), {mode:"lines", a, z, baseVersion:cur.currentVersion, text:ta.value, at:nowIso()}); }, 400); };
+  $("#leCancel").onclick = () => {
+    const b = $("#leCancel");
+    if (ta.value !== orig && !b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "書き換えを捨てて閉じる"; return; }
+    ls.del(draftKey()); closeModal(); if (view === "text") renderText();
+  };
+  $("#leSave").onclick = async () => {
+    const nw = ta.value.replace(/\r\n?/g, "\n");
+    if (nw === orig) { toast("変わっていません"); return; }
+    const doneIds = [...document.querySelectorAll(".dialog [data-done]")].filter(x => x.checked).map(x => x.dataset.done);
+    const L = curLines(), next = [...L.slice(0, a), ...nw.split("\n"), ...L.slice(z + 1)].join("\n");
+    try {
+      await setBody(next, `L${nb(a)}${z > a ? "～L" + nb(z) : ""}を書き換え`, "edit");
+      ls.del(draftKey()); closeModal(); clearSel(); bump("edits");
+      const ms = doneIds.map(id => cur.marks.find(m => m.id === id)).filter(Boolean);
+      if (ms.length) doneMarks(ms, {quiet:true});
+      renderView(); savedToast();
+      if (ms.length) praiseForMarks(ms); else praiseForEdit(orig, nw);
+    } catch (e) { toast("保存できませんでした: " + errText(e)); }
+  };
+}
+
+// ---------- 依頼の文 ----------
+function markLabel(m){
+  if (m.kind === "fix") return m.type;
+  if (m.kind === "blank") return m.start != null && m.start === m.end ? "文中に入れる" : "穴埋め";
+  return "新しく入れる";
+}
+// 依頼の文の「作品」と「節」: いちばん上のフォルダを作品、作業の名前を節とする。
+// フォルダに入っていない作業や、作業の名前が作品名と同じ古い作業は、これまでどおり名前と節の欄を使う
+function workNames(w){
+  const top = (w.folder || "").split("/")[0].trim(), t = (w.title || "").trim();
+  if (!top) return {work: t, section: (w.section || "").trim()};
+  if (!t || t === top) return {work: top, section: (w.section || "").trim()};
+  return {work: top, section: t};
+}
+const namesLine = w => { const n = workNames(w); return n.work + (n.section ? " " + n.section : ""); };
+// 印のあらまし（一行で）
+function markGist(m){
+  if (m.kind === "blank" && m.start != null && m.start === m.end) { const L = m.lineTexts[0]; return `${L.slice(Math.max(0, m.start - 8), m.start).trim()}｜${L.slice(m.start, m.start + 8).trim()}`; }
+  if (m.kind === "insert") return `${qt(m.lineTexts[0]).slice(-12)} の後`;
+  return qt(m.quote) || m.adds.join("／");
+}
+// 行で指定するときの範囲（作業ごとに覚える）。本文の行番号（L1～）で、範囲の外へはみ出さないようにする
+// 本文の範囲は cur.reqRange、印の範囲は cur.markRange
+function lineRange(t, maxN){
+  t = t || {}; const c = v => Math.min(maxN, Math.max(1, Math.round(+v) || 1));
+  let a = c(t.a || 1), b = c(t.b || maxN);
+  if (a > b) [a, b] = [b, a];
+  return {a, b};
+}
+// L番号の範囲を、行の位置（空行を含む並びの番号）の範囲へ
+function lineSpan(rg, nB, total){
+  let ia = nB.indexOf(rg.a), ib = nB.indexOf(rg.b);
+  if (ia < 0) ia = 0; if (ib < 0) ib = total - 1;
+  return [ia, ib];
+}
+function buildRequest(){
+  const lines = curLines(), nB = lineNumbers(lines), order = blankOrder(lines);
+  let open = cur.marks.filter(m => m.status === "open").map(m => ({m, p: locate(m, lines)})).filter(x => x.p);
+  const maxN = nB.reduce((x, y) => y ? Math.max(x, y) : x, 0) || 1;
+  const range = lineRange(cur.reqRange, maxN), mRange = lineRange(cur.markRange, maxN);
+  let outside = 0;
+  if (markScope === "lines") {
+    // 印の範囲に収まる印だけを依頼に入れる
+    const [ma, mb] = lineSpan(mRange, nB, lines.length);
+    const inside = x => x.p.i >= ma && x.p.i + x.p.n - 1 <= mb;
+    outside = open.filter(x => !inside(x)).length;
+    open = open.filter(inside);
+  }
+  const blanksByLine = new Map(), insertsAfter = new Map();
+  for (const {m, p} of open) {
+    if (m.kind === "blank" && p.start != null) (blanksByLine.get(p.i) || blanksByLine.set(p.i, []).get(p.i)).push({s:p.start, e:p.end, c:order.get(m.id)});
+    if (m.kind === "insert" && m.start == null) { const at = p.i + p.n - 1; (insertsAfter.get(at) || insertsAfter.set(at, []).get(at)).push(order.get(m.id)); }
+  }
+  let keep = null;
+  const len = i => lines[i].replace(/\s/g, "").length;
+  // 本文: 選んだ印の行は必ず入れ、そのうえで本文の範囲（行で指定、または印の前後○字）を足す
+  let markOutsideBody = false;
+  if (outScope === "lines") {
+    keep = new Set();
+    const [ia, ib] = lineSpan(range, nB, lines.length);
+    for (let i = ia; i <= ib; i++) keep.add(i);
+    for (const {p} of open) for (let i = p.i; i < p.i + p.n; i++) { if (!keep.has(i)) markOutsideBody = true; keep.add(i); }
+  } else if (outScope !== "all") {
+    const half = Number(outScope) / 2;
+    keep = new Set();
+    for (const {p} of open) {
+      for (let i = p.i; i < p.i + p.n; i++) keep.add(i);
+      for (let i = p.i - 1, c = 0; i >= 0 && c < half; i--) { keep.add(i); c += len(i); }
+      for (let i = p.i + p.n, c = 0; i < lines.length && c < half; i++) { keep.add(i); c += len(i); }
+    }
+  }
+  let bodyChars = 0;
+  const body = []; let skipped = false;
+  lines.forEach((l, i) => {
+    if (keep && !keep.has(i)) { if (!skipped) { body.push("……"); skipped = true; } return; }
+    skipped = false; bodyChars += len(i);
+    let t = l;
+    for (const b of (blanksByLine.get(i) || []).sort((x,y)=>(y.s-x.s) || (y.e-x.e))) t = t.slice(0, b.s) + b.c + t.slice(b.e);
+    body.push(nB[i] ? `L${nB[i]} ${t}` : "");
+    for (const c of (insertsAfter.get(i) || [])) body.push(`L${nB[i] ?? "?"}+ ${c}`);
+  });
+  const items = open.slice().sort((a,b) => (a.p.i - b.p.i) || ((a.p.start ?? 0) - (b.p.start ?? 0)));
+  const short = s => s.length > 40 ? s.slice(0, 40) + "…" : s;
+  const reqLines = items.map(({m, p}, k) => {
+    const at = p.n > 1 ? `L${nB[p.i]}～L${nB[p.i+p.n-1]}` : `L${nB[p.i] ?? "?"}`;
+    const parts = [];
+    if (m.kind === "blank") {
+      if (p.start == null) parts.push("穴埋め", at, "（元の語が見つかりません）");
+      else parts.push(`穴埋め${order.get(m.id)}`, p.start === p.end ? `${at}（文中に足す）` : at);
+      parts.push(`入れたいもの: ${m.adds.join("／") || "（指定なし）"}`);
+    }
+    else if (m.kind === "insert") parts.push(`新しく入れる${order.get(m.id)}`, `L${nB[p.i+p.n-1] ?? "?"}の後`, `入れたいもの: ${m.adds.join("／") || "（指定なし）"}`);
+    else {
+      const q = p.start != null ? lines[p.i].slice(p.start, p.end) : qt(lines.slice(p.i, p.i + p.n).join("\n"));
+      parts.push(m.type, `${at}「${short(qt(q))}」`); if (m.concerns.length) parts.push(`気になる点: ${m.concerns.join("／")}`); if (m.directions.length) parts.push(`向き: ${m.directions.join("／")}`);
+    }
+    if (m.comment) parts.push(`コメント: ${m.comment.replace(/\n+/g, " ")}`);
+    return `${k+1}. ${parts.join("｜")}`;
+  });
+  const nm = workNames(cur);
+  const head = [`【${FORMAT}】`, `作品: ${nm.work}`]; if (nm.section) head.push(`節: ${nm.section}`);
+  const out = [...head, "", "■本文" + (outScope === "all" ? "" : outScope === "lines" ? (markOutsideBody ? `（L${range.a}～L${range.b}と、依頼のある行）` : `（L${range.a}～L${range.b}）`) : `（依頼のある行と、その前後 約${outScope}字）`), ...body, "", "■依頼", ...(reqLines.length ? reqLines : ["（印がありません）"])];
+  if (cur.globalComment && cur.globalComment.trim()) out.push("", "■全体のコメント", cur.globalComment.trim());
+  return {text: out.join("\n"), bodyChars, markIds: items.map(x => x.m.id), lost: cur.marks.filter(m => m.status === "open" && !locate(m, lines)), outside, range, mRange, maxN, markOutsideBody};
+}
+
+function markItem(m, lines, nB, order){
+  const p = locate(m, lines);
+  const at = p ? markWhere(m, lines, nB) : "";
+  const kindLabel = markLabel(m) + (m.kind !== "fix" && m.status === "open" ? (order.get(m.id) || "") : "");
+  const tags = [...m.concerns, ...m.directions, ...m.adds].map(t => `<span>${esc(t)}</span>`).join("");
+  let q;
+  if (m.kind === "insert" && m.start == null) q = `（${esc(qt(m.lineTexts[0]))} の後）`;
+  else if (m.kind === "blank" && m.start === m.end) { const L = m.lineTexts[0]; q = `${esc(qt(L.slice(0, m.start)))}<span class="caret" style="color:var(--blank)">｜</span>${esc(L.slice(m.start).trim())}`; }
+  else if (m.kind === "blank") q = `空欄にする語「${esc(m.quote)}」`;
+  else q = esc(qt(m.quote));
+  const touched = m.status === "open" && m.touched;
+  const fill = m.status === "done" && m.kind === "blank" && m.afterFill != null ? `<dt>入った語</dt><dd>${esc(m.afterFill) || "（なし）"}</dd>` : "";
+  return `<div class="mitem${m.status === "done" ? " done" : ""}${touched ? " touched" : ""}">
+    <div class="mhead"><span class="kind ${m.kind}">${esc(kindLabel)}</span><span class="where">${at}</span>${touched ? `<span class="flag">${m.touched.how === "removed" ? "書き換えで行が消えました" : "書き換えで直されました"}</span>` : ""}${p ? "" : `<span class="lost">今の本文で場所が見つかりません</span>`}${m.rangeLost && m.status === "open" ? `<span class="lost">元の語が見つからないので行全体に付けています</span>` : ""}</div>
+    <div class="quote">${q}</div>
+    ${tags ? `<div class="tags">${tags}</div>` : ""}
+    ${m.comment ? `<div style="font-size:13px">${esc(m.comment)}</div>` : ""}
+    ${m.status === "done" && m.after != null ? `<dl class="ba"><dt>直した後</dt><dd>${esc(m.after) || "（何も入っていない・行がなくなった）"}</dd>${fill}</dl>` : ""}
+    <div class="mfoot"><button class="btn" data-edit="${m.id}">開く</button>${m.status === "open" ? `<button class="btn${touched ? " primary" : ""}" data-done="${m.id}">済みにする</button>` : `<button class="btn ghost" data-reopen="${m.id}">未対応に戻す</button>`}<button class="btn danger" data-del="${m.id}" style="margin-left:auto">削除</button></div>
+  </div>`;
+}
+function bindMarkButtons(root){
+  root.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => openMarkEditor(cur.marks.find(x => x.id === b.dataset.edit)));
+  root.querySelectorAll("[data-done]").forEach(b => b.onclick = () => doneMarks([cur.marks.find(x => x.id === b.dataset.done)]));
+  root.querySelectorAll("[data-del]").forEach(b => b.onclick = () => {
+    if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "もう一度押すと削除します"; return; }
+    deleteMark(b.dataset.del);
+  });
+  root.querySelectorAll("[data-reopen]").forEach(b => b.onclick = () => { const m = cur.marks.find(x => x.id === b.dataset.reopen); m.status = "open"; m.reopenedAt = nowIso(); delete m.touched; scheduleSave(); renderView(); });
+}
+// 済みにした時点の本文から「どう直したか」を残す（今の位置の行だけ）
+function markDone(m){
+  const lines = curLines(), p = locate(m, lines);
+  let after = "", afterFill = null;
+  if (m.kind === "insert" && m.start == null) after = (m.insertedLines || []).filter(l => l.trim()).join("\n");
+  else if (p) after = lines.slice(p.i, p.i + p.n).filter(l => l.trim()).join("\n");
+  if (m.kind === "blank" && p && m.start != null) {
+    const o = m.lineTexts[0], cl = lines[p.i], pre = o.slice(0, m.start), suf = o.slice(m.end);
+    if (cl.startsWith(pre) && cl.endsWith(suf) && cl.length >= pre.length + suf.length) afterFill = cl.slice(pre.length, cl.length - suf.length);
+  }
+  m.status = "done"; m.doneAt = nowIso(); m.doneVersion = cur.currentVersion; m.afterVersion = cur.currentVersion;
+  m.after = after; m.afterFill = afterFill;
+  m.afterSameAsBefore = after === m.lineTexts.filter(l => l.trim()).join("\n");
+}
+function doneMarks(ms, opts = {}){
+  ms = ms.filter(Boolean);
+  if (!ms.length) return;
+  for (const m of ms) markDone(m);
+  bump("done", ms.length);
+  scheduleSave();
+  if (!opts.quiet) { renderView(); toast(ms.length > 1 ? `${ms.length}件を済みにしました` : "済みにしました"); praiseForMarks(ms); }
+}
+
+function renderRequest(){
+  const m = $("#main");
+  if (!cur) { m.innerHTML = emptyState(); bindEmpty(); return; }
+  const lines = curLines(), nB = lineNumbers(lines), order = blankOrder(lines);
+  const open = cur.marks.filter(x => x.status === "open");
+  const total = cur.marks.length, done = total - open.length;
+  const r = buildRequest();
+  const touched = open.filter(x => x.touched);
+  m.innerHTML = `<div class="grid2">
+    <div class="stack">
+      ${total ? `<div class="card stack" style="gap:6px"><div class="row2"><b style="font-size:13px">進み具合</b><span class="hint">済み ${done} / 印 ${total}</span></div><div class="progress"><i style="width:${Math.round(done / total * 100)}%"></i></div></div>` : ""}
+      <div class="card"><div class="row2" style="margin-bottom:10px"><h3 style="margin:0;flex:1">未対応の印（${open.length}）</h3>${touched.length >= 2 ? `<button class="btn small primary" id="doneTouched">直された${touched.length}件を済みにする</button>` : ""}</div><div class="mlist">${open.length ? open.map(x => markItem(x, lines, nB, order)).join("") : `<p class="hint" style="margin:0">本文タブで行を選んで印を付けると、ここに並びます。</p>`}</div></div>
+      <div class="card"><label class="fld" for="gComment">全体のコメント（この依頼だけに付ける自由な指示）<textarea id="gComment" rows="3">${esc(cur.globalComment || "")}</textarea></label></div>
+    </div>
+    <div class="card stack">
+      <h3 style="margin:0">依頼の文</h3>
+      <div class="group"><span class="gl">印の範囲（依頼に入れる印）</span>
+        <div class="row2"><div class="seg" role="group" aria-label="印の範囲"><button data-mscope="all" aria-pressed="${markScope==="all"}">すべて</button><button data-mscope="lines" aria-pressed="${markScope==="lines"}">行で指定</button></div>
+        ${markScope === "lines" ? rangeInputs("mk", r.mRange, r.maxN) : ""}</div>
+        <span class="hint" id="mkHint">${markHint(r)}</span></div>
+      <div class="group"><span class="gl">本文の範囲（依頼のある行は必ず入ります）</span>
+        <div class="seg" role="group" aria-label="本文の範囲" style="flex-wrap:wrap;align-self:flex-start">${SCOPES.map(([v, t]) => `<button data-scope="${v}" aria-pressed="${outScope===v}">${t}</button>`).join("")}</div>
+        ${outScope === "lines" ? rangeInputs("rq", r.range, r.maxN) : ""}
+        <span class="hint" id="rqHint">${scopeHint(r)}</span></div>
+      ${r.lost.length ? `<p class="lost" style="margin:0">今の本文で場所が見つからない印が${r.lost.length}件あり、依頼の文には入っていません。開いて確かめてください。</p>` : ""}
+      <pre class="out" id="outPre">${esc(r.text)}</pre>
+      <div class="row2"><button class="btn primary" id="copyReq">依頼の文をコピー</button><span class="hint">スキルの指定と一緒にAIへ貼り付けてください。コピーした内容は記録に残ります。</span></div>
+    </div>
+  </div>`;
+  bindMarkButtons(m);
+  const dt = $("#doneTouched"); if (dt) dt.onclick = () => doneMarks(touched);
+  m.querySelectorAll("[data-scope]").forEach(b => b.onclick = () => { outScope = b.dataset.scope; ls.set("kaikou.outScope2", outScope); renderRequest(); });
+  m.querySelectorAll("[data-mscope]").forEach(b => b.onclick = () => { markScope = b.dataset.mscope; ls.set("kaikou.markScope", markScope); renderRequest(); });
+  bindRange("rq", "reqRange", "range");
+  bindRange("mk", "markRange", "mRange");
+  const g = $("#gComment"); let gt = null;
+  g.oninput = () => { clearTimeout(gt); gt = setTimeout(() => { cur.globalComment = g.value; scheduleSave(); $("#outPre").textContent = buildRequest().text; }, 500); };
+  $("#copyReq").onclick = () => {
+    cur.globalComment = g.value;
+    const rr = buildRequest();
+    copyText(rr.text, $("#outPre"));
+    const rec = {id:uid("r"), at:nowIso(), version:cur.currentVersion, markIds:rr.markIds, scope:outScope, range: outScope === "lines" ? rr.range : null, markRange: markScope === "lines" ? rr.mRange : null, format:FORMAT, text:rr.text};
+    if (!cur.sample) { store.addRequest(cur.id, rec).catch(() => {}); }
+    (requestsCache ||= []).push(rec);
+    cur.lastRequestAt = rec.at; scheduleSave();
+  };
+}
+function scopeHint(r){
+  if (outScope === "lines") return `指定した行と、依頼のある行を本文に付けます${r.markOutsideBody ? "（依頼のある行の一部が範囲の外にあるので、その行も足しています）" : ""}。いま付く本文は約${r.bodyChars}字です。`;
+  if (outScope === "all") return `本文をすべて付けます。いま付く本文は約${r.bodyChars}字です。`;
+  return `依頼のある行と、その前後の本文を付けます（前と後ろに半分ずつ、行の切れ目で区切ります）。いま付く本文は約${r.bodyChars}字です。`;
+}
+function markHint(r){
+  if (markScope === "lines") return `この範囲に収まる印だけを依頼に入れます${r.outside ? `（今は${r.outside}件が範囲の外）` : ""}。`;
+  return "未対応の印をすべて依頼に入れます。";
+}
+// L□～L□ の欄（key: rq＝本文、mk＝印）
+function rangeInputs(key, rg, maxN){
+  return `<div class="row2" style="font-size:13px"><label for="${key}A">L</label><input type="number" inputmode="numeric" id="${key}A" class="rqn" min="1" max="${maxN}" value="${rg.a}"><span>～</span><label for="${key}B">L</label><input type="number" inputmode="numeric" id="${key}B" class="rqn" min="1" max="${maxN}" value="${rg.b}"><span class="hint">本文は L1～L${maxN}</span></div>`;
+}
+// 範囲の欄: 入れるたびに依頼の文を作り直し（欄の中身は書き換えず、入力の途中で邪魔をしない）、
+// 入れ終えたら（欄から離れたら）本文の外の番号を最初・最後の行に直して欄にも出す
+function bindRange(key, field, rKey){
+  const ea = $("#" + key + "A"), eb = $("#" + key + "B"); if (!ea) return;
+  let t = null;
+  const show = rr => { $("#outPre").textContent = rr.text; $("#rqHint").textContent = scopeHint(rr); $("#mkHint").textContent = markHint(rr); };
+  const live = () => { clearTimeout(t); t = setTimeout(() => { if (!ea.value || !eb.value) return; cur[field] = {a: +ea.value, b: +eb.value}; scheduleSave(); show(buildRequest()); }, 300); };
+  const fix = () => {
+    if (!ea.value || !eb.value) return;
+    clearTimeout(t); cur[field] = {a: +ea.value, b: +eb.value};
+    const rr = buildRequest(); cur[field] = rr[rKey]; scheduleSave();
+    ea.value = rr[rKey].a; eb.value = rr[rKey].b; show(rr);
+  };
+  ea.oninput = eb.oninput = live; ea.onchange = eb.onchange = fix;
+}
+function copyText(text, fallbackEl){
+  const done = () => toast("コピーしました");
+  const fail = () => { if (fallbackEl) { const r = document.createRange(); r.selectNodeContents(fallbackEl); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } toast("自動でコピーできませんでした。選んだ範囲をコピーしてください"); };
+  try { navigator.clipboard.writeText(text).then(done, fail); } catch { fail(); }
+}
+
+// ---------- 版 ----------
+async function getVersions(){
+  if (!cur) return [];
+  if (versionsCache) return versionsCache;
+  try { versionsCache = await store.listVersions(cur.id); } catch { versionsCache = []; }
+  return versionsCache;
+}
+// 本文を書き換える（版は作らない。印は行の対応で運び、取り消し用に直前の本文と印の状態を残す）
+// currentVersion は本文を書き換えた回数（印の位置の照合に使う内部の番号）で、保存した版の番号とは別
+// 取り消し用の本文と印は作業の記録とは別の文書（works/<id>/undo/<key>）に置き、作業の記録には目次 {v, from, note, key} だけを残す。
+// 作業の記録に入れていた v6 までは、1件256KBの上限を超えて保存できなくなった（10/17）
+const UNDO_MAX = 5;
+const undoCache = new Map();   // key -> {prevText, marks}（この画面で作った分と読んだ分）
+function putUndoDoc(id, key, body, retry = 1){
+  return store.putUndo(id, key, body).catch(e => {
+    if (retry && e && e.code === "unavailable") return new Promise(r => setTimeout(r, 1500 + Math.random()*1000)).then(() => putUndoDoc(id, key, body, 0));
+    throw e;
+  });
+}
+function dropUndoDocs(id, list){ for (const d of list) { if (!d.key) continue; undoCache.delete(d.key); if (!(cur && cur.sample)) store.deleteUndo(id, d.key).catch(() => {}); } }
+async function setBody(text, note, source){
+  const n = cur.currentVersion + 1;
+  const key = uid("u"), body = {prevText:cur.current, marks: clone(cur.marks)};
+  carryMarks(curLines(), linesOf(text), n);
+  cur.current = text; cur.currentVersion = n;
+  if (source !== "undo") {
+    undoCache.set(key, body);
+    const all = [...(cur.undo || []), {v:n, from:n - 1, note: note || "", key}];
+    cur.undo = all.slice(-UNDO_MAX);
+    dropUndoDocs(cur.id, all.slice(0, -UNDO_MAX));
+    if (!cur.sample) putUndoDoc(cur.id, key, body).catch(() => {});   // 保存できなくても、この画面を開いている間は取り消せる
+  }
+  scheduleSave(); renderFab();
+}
+// v6 までの作業は、取り消し用の本文と印を作業の記録の中に持っている。別の文書へ移して、作業の記録を軽くする
+async function moveOldUndo(){
+  const w = cur;
+  if (!w || !Array.isArray(w.undo)) return;
+  const old = w.undo.filter(u => !u.key);
+  if (!old.length) return;
+  w.undo = w.undo.map(u => {
+    if (u.key) return u;
+    const key = uid("u"), body = {prevText: u.prevText ?? null, marks: u.marks || []};
+    undoCache.set(key, body);
+    if (!w.sample) putUndoDoc(w.id, key, body).catch(() => {});
+    return {v:u.v, from:u.from, note:u.note || "", key};
+  });
+  scheduleSave();
+}
+// 今の本文を版として保存する（右下のボタン・版タブ）
+async function saveVersion(note){
+  const vs = await getVersions();
+  const last = vs.filter(v => v.n > 0).sort((a, b) => b.at.localeCompare(a.at))[0];
+  if (last && last.text === cur.current) { toast("最後に保存した版と同じ本文です"); return false; }
+  const n = Math.max(0, ...vs.map(v => v.n)) + 1;
+  const v = {n, text:cur.current, at:nowIso(), note: note || "", source:"save", nonspace: nsLen(cur.current)};
+  if (!cur.sample) await store.addVersion(cur.id, v);
+  vs.push(v); versionsCache = vs;
+  cur.lastSavedAt = v.at; scheduleSave();
+  return true;
+}
+function openSaveVersion(){
+  showModal(`<h2>版として保存</h2>
+    <p class="hint" style="margin:0">今の本文を版として残します。版タブで見比べたり、戻したりできます。</p>
+    <label class="fld" for="svTitle">題（任意。例: 先輩に見せる前）<input type="text" id="svTitle"></label>
+    <div class="dfoot"><button class="btn ghost" id="svCancel">閉じる</button><button class="btn primary" id="svOk">保存</button></div>`);
+  const t = $("#svTitle"); t.focus();
+  t.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) $("#svOk").click(); });
+  $("#svCancel").onclick = closeModal;
+  $("#svOk").onclick = async () => {
+    $("#svOk").disabled = true;
+    try { if (await saveVersion(t.value.trim())) { closeModal(); toast("版を保存しました"); if (view === "versions") renderVersions(); } else $("#svOk").disabled = false; }
+    catch (e) { $("#svOk").disabled = false; toast("保存できませんでした: " + errText(e)); }
+  };
+}
+function setBase(v){ baseText = v && v.n > 0 ? v.text : null; baseN = v && v.n > 0 ? v.n : null; baseLabel = v && v.n > 0 ? verShort(v) : "原文"; }
+// ---------- 書き換えを取り消す ----------
+// 直前の書き換えの前の本文に戻し、印の状態（済み・場所）も書き換えの前に戻す。続けて押すと、さらに前へ（最大5回）
+function undoTop(){ const u = cur && cur.undo && cur.undo[cur.undo.length - 1]; return u && u.v === cur.currentVersion ? u : null; }
+let undoBusy = false;
+async function undoLast(){
+  if (undoBusy) return;
+  undoBusy = true;
+  try { await undoLastInner(); } finally { undoBusy = false; }
+}
+async function undoLastInner(){
+  const u = undoTop(); if (!u) return;
+  const w = cur;
+  let rec = undoCache.get(u.key) || null;
+  if (!rec && !w.sample) { try { rec = await store.getUndo(w.id, u.key); } catch { rec = null; } }
+  if (cur !== w || undoTop() !== u) return;   // 読んでいる間に作業を替えた・ほかの書き換えをした
+  let prevText = rec ? rec.prevText : null;
+  if (rec && prevText == null) { const vs = await getVersions(), prev = vs.find(x => x.n === u.from); prevText = prev ? prev.text : null; }   // v3で残した取り消しの記録
+  if (prevText == null) {
+    cur.undo = cur.undo.slice(0, -1); scheduleSave(); renderFab();
+    toast("前の本文が見つからないので取り消せません"); return;
+  }
+  const before = new Map((rec.marks || []).map(m => [m.id, m]));
+  await setBody(prevText, "書き換えを取り消した", "undo");
+  const n = cur.currentVersion;
+  cur.marks = cur.marks.map(m => {
+    const b = before.get(m.id); if (!b) return m;
+    const r = clone(b);
+    for (const k of ["comment", "concerns", "directions", "adds", "type"]) r[k] = m[k];   // 後から直した分類やコメントは残す
+    r.at = b.at && b.at.v === u.from ? Object.assign({}, b.at, {v:n}) : m.at;
+    return r;
+  });
+  cur.undo = cur.undo.slice(0, -1);
+  dropUndoDocs(cur.id, [u]);
+  const t = cur.undo[cur.undo.length - 1]; if (t && t.v === u.from) t.v = n;
+  scheduleSave(); renderView(); toast("書き換えを取り消しました");
+}
+// ---------- 右下のボタン（版として保存・取り消し） ----------
+const ICON_UNDO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
+const ICON_EYE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const ICON_EYE_OFF = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.4 3.3"/><path d="M6.6 6.6C3.7 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>`;
+const ICON_PEN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`;
+const ICON_SAVE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>`;
+function renderFab(){
+  const el = $("#fab"), show = !!cur && view === "text" && !editing;
+  document.body.classList.toggle("has-fab", show);
+  if (!show) { el.innerHTML = ""; return; }
+  const u = undoTop();
+  const diffBtn = `<button type="button" id="fabDiff" aria-pressed="${noDiff}" aria-label="${noDiff ? "変更の色を表示する" : "変更の色を隠す（印だけ見る）"}" title="${noDiff ? "変更の色を表示する" : "変更の色を隠す（印だけ見る）"}">${noDiff ? ICON_EYE_OFF : ICON_EYE}</button>`;
+  const penBtn = `<button type="button" id="fabWrite" aria-pressed="${writeMode}" aria-label="${writeMode ? "書くモードを終える" : "書くモード（行をタップしてその場で直す）"}" title="${writeMode ? "書くモードを終える" : "書くモード（行をタップしてその場で直す）"}">${ICON_PEN}</button>`;
+  el.innerHTML = `<div class="fab">${penBtn}${writeMode ? "" : diffBtn}<button type="button" class="main" id="fabSave" aria-label="版として保存" title="版として保存">${ICON_SAVE}</button><button type="button" id="fabUndo" aria-label="書き換えを取り消す" title="${u ? "書き換えを取り消す（" + esc(u.note) + "）" : "取り消せる書き換えはありません"}"${u ? "" : " disabled"}>${ICON_UNDO}</button></div>`;
+  $("#fabSave").onclick = openSaveVersion;
+  $("#fabUndo").onclick = undoLast;
+  $("#fabWrite").onclick = () => setWriteMode(!writeMode);
+  if ($("#fabDiff")) $("#fabDiff").onclick = () => { noDiff = !noDiff; ls.set("kaikou.noDiff", noDiff); renderText(); renderFab(); toast(noDiff ? "変更の色を隠しました（印だけ表示）" : "変更の色を表示しました"); };
+}
+async function renderVersions(){
+  const m = $("#main");
+  if (!cur) { m.innerHTML = emptyState(); bindEmpty(); return; }
+  m.innerHTML = `<div class="grid2">
+    <div class="card stack">
+      <h3 style="margin:0">AIの答えを全文で入れる</h3>
+      <label class="fld" for="newVer">全文を貼り付けてください（一部だけ直すときは、本文タブで行を選んで「書き換える」が楽です）<textarea id="newVer" class="body" placeholder="本文を貼り付け"></textarea></label>
+      <label class="switch" for="newVerKeep"><input type="checkbox" id="newVerKeep" checked>入れ替える前の本文を版として残す</label>
+      <div class="row2"><button class="btn primary" id="saveVer">本文を入れ替える</button></div>
+      <p class="hint" style="margin:0">印は行の対応をたどって付いてきます。直された行の印には「書き換えで直されました」と出ます。</p>
+    </div>
+    <div class="card stack"><div class="row2"><h3 style="margin:0;flex:1">版の一覧</h3><button class="btn small" id="verNow">今の本文を版として保存</button></div>
+      <p class="hint" style="margin:0">版は、本文タブの右下の保存ボタンを押したときだけ残ります。ふだんの書き換えは版にならず、作業中の本文として自動で保存されます。</p>
+      <div class="vlist" id="vlist"><p class="hint">読み込み中…</p></div></div>
+  </div>`;
+  $("#verNow").onclick = openSaveVersion;
+  $("#saveVer").onclick = async () => {
+    const t = $("#newVer").value.replace(/\r\n?/g, "\n");
+    if (!t.trim()) { toast("本文が空です"); return; }
+    if (t === cur.current) { toast("今の本文と同じです"); return; }
+    try {
+      if ($("#newVerKeep").checked) await saveVersion("AIの答えを入れる前");
+      await setBody(t, "AIの答えを全文で入れた", "paste"); bump("edits"); view = "text"; renderAll(); savedToast();
+    } catch (e) { toast("保存できませんでした: " + errText(e)); }
+  };
+  const vs = await getVersions();
+  const list = vs.slice().sort((a, b) => a.n === 0 ? 1 : b.n === 0 ? -1 : b.at.localeCompare(a.at));
+  $("#vlist").innerHTML = list.map(v => `<div class="vitem"><div class="meta"><b>${esc(verTitle(v))}</b>${(v.nonspace ?? nsLen(v.text)).toLocaleString()}字${v.text === cur.current ? `<span class="cur-tag">今の本文と同じ</span>` : ""}</div>
+    <button class="btn" data-cmp="${v.n}">これと比べる</button>${v.text !== cur.current ? `<button class="btn" data-restore="${v.n}">この版に戻す</button>` : ""}${v.n !== 0 ? `<button class="btn danger" data-vdel="${v.n}">削除</button>` : ""}</div>`).join("") || `<p class="hint">版がまだありません。</p>`;
+  $("#vlist").querySelectorAll("[data-cmp]").forEach(b => b.onclick = () => { setBase(vs.find(x => String(x.n) === b.dataset.cmp)); view = "text"; renderAll(); });
+  $("#vlist").querySelectorAll("[data-restore]").forEach(b => b.onclick = async () => {
+    if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "もう一度押すと戻します"; return; }
+    const v = vs.find(x => String(x.n) === b.dataset.restore);
+    await setBody(v.text, `「${verShort(v)}」に戻した`, "restore"); toast("この版の本文に戻しました", {label:"取り消す", fn:undoLast}); renderVersions();
+  });
+  $("#vlist").querySelectorAll("[data-vdel]").forEach(b => b.onclick = async () => {
+    if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "もう一度押すと削除します"; return; }
+    const n = +b.dataset.vdel;
+    try { if (!cur.sample) await store.deleteVersion(cur.id, n); versionsCache = vs.filter(x => x.n !== n); if (baseN === n) setBase(null); toast("版を削除しました"); renderVersions(); }
+    catch (e) { toast("削除できませんでした: " + errText(e)); }
+  });
+}
+
+// ---------- 記録 ----------
+async function renderLog(){
+  const m = $("#main");
+  if (!cur) { m.innerHTML = emptyState(); bindEmpty(); return; }
+  const lines = curLines(), nB = lineNumbers(lines), order = blankOrder(lines);
+  const done = cur.marks.filter(x => x.status === "done");
+  const open = cur.marks.filter(x => x.status === "open");
+  if (!requestsCache) { try { requestsCache = cur.sample ? [] : await store.listRequests(cur.id); } catch { requestsCache = []; } }
+  const reqs = requestsCache.slice().sort((a,b)=>b.at.localeCompare(a.at));
+  const week = []; for (let k = 6; k >= 0; k--) { const d = new Date(); d.setDate(d.getDate() - k); week.push({d, v: dayTotal(activity.days[dayKey(d)])}); }
+  const wmax = Math.max(1, ...week.map(x => x.v));
+  const lastPraise = (activity.praises || []).slice(-1)[0];
+  m.innerHTML = `<div class="grid2">
+    <div class="stack">
+      <div class="card stack">
+        <h3 style="margin:0">机に向かった記録</h3>
+        <div class="row2" style="align-items:flex-end;gap:18px">
+          <div class="week" aria-label="この7日の作業の数">${week.map(x => `<div><span>${x.v || ""}</span><i class="${x.v ? "" : "zero"}" style="height:${x.v ? Math.max(4, Math.round(x.v / wmax * 40)) : 2}px"></i><span>${"日月火水木金土"[x.d.getDay()]}</span></div>`).join("")}</div>
+          <div class="stat"><span><b>${streak()}</b>日続けて</span></div>
+        </div>
+        ${lastPraise ? `<div class="saybox">${esc(lastPraise.text)}</div><span class="hint">${fmtTime(lastPraise.at)} のひとこと</span>` : ""}
+        <div class="row2"><button class="btn" id="praiseToday">今日のひとこと</button><span class="hint">直したときのひとことは設定タブで止められます。</span></div>
+      </div>
+      <div class="card"><div class="stat"><span><b>${cur.marks.length}</b>件の印</span><span><b>${open.length}</b>未対応</span><span><b>${done.length}</b>済み</span><span><b>${reqs.length}</b>回の依頼</span><span><b>${cur.currentVersion}</b>版目</span></div></div>
+      <div class="card"><h3>済みにした印</h3><div class="mlist">${done.length ? done.map(x => markItem(x, lines, nB, order)).join("") : `<p class="hint" style="margin:0">「依頼」タブで済みにすると、そのときの本文から直した後の文を自動で残します。</p>`}</div></div>
+    </div>
+    <div class="stack">
+      <div class="card stack"><h3 style="margin:0">研究用の記録</h3>
+        <p class="hint" style="margin:0">印の場所・分類・コメント・直した後の文、依頼の履歴、すべての版をまとめた形（JSON）でコピーします。コピーした文は、この端末のクリップボードの履歴に残ることがあります。</p>
+        <div class="row2"><button class="btn" id="copyJson">記録をコピー</button></div></div>
+      <div class="card"><h3>依頼の履歴</h3><div class="vlist">${reqs.length ? reqs.map(r => `<div class="vitem"><div class="meta"><b>${fmtTime(r.at)}</b>印${r.markIds.length}件${r.markRange ? `（L${r.markRange.a}～L${r.markRange.b}）` : ""} ・ 本文 ${scopeLabel(r.scope, r.range)}</div><button class="btn" data-recopy="${r.id}">もう一度コピー</button></div>`).join("") : `<p class="hint" style="margin:0">まだ依頼をコピーしていません。</p>`}</div></div>
+    </div>
+  </div>`;
+  bindMarkButtons(m);
+  m.querySelectorAll("[data-recopy]").forEach(b => b.onclick = () => { const r = reqs.find(x => x.id === b.dataset.recopy); copyText(r.text, null); });
+  $("#copyJson").onclick = async () => { const vs = await getVersions(); copyText(JSON.stringify(exportJson(vs, reqs), null, 1), null); };
+  $("#praiseToday").onclick = praiseToday;
+}
+
+// ---------- 設定 ----------
+const HELP_ITEMS = [
+  "棚（上の作業名のボタン）で作品名のフォルダ（中に章のフォルダを作ってもかまいません）を作り、「新しい作業」で名前を節（例: 3-2）にして原文を貼り付けます（一文一行のままで大丈夫です）。依頼の文には、いちばん上のフォルダが作品、作業の名前が節として入ります。",
+  "本文タブで、気になる行をタップするか、行の中の語をドラッグ（スマホは長押し）で選びます。",
+  "下に出る帯から選びます。「気になる点」「空欄にする」、語の「この前に入れる」「この後に入れる」、行の「この行の後に入れる」「一文にまとめる」「書き換える」。",
+  "依頼タブで「依頼の文をコピー」し、スキルの指定と一緒にAIへ貼り付けます。",
+  "直すときは、行を選んで「書き換える」、または本文タブの「本文を書き換える」。AIの答えを全文で入れるときは版タブへ。書き換えは作業中の本文として自動で保存され、版にはなりません。版として残したいときは、本文タブの右下の保存ボタン（下は書き換えを取り消すボタン）を押します。",
+  "その場で直したいときは、右下の鉛筆で「書くモード」にして行をタップします（PCは行をダブルクリックするだけでも直せます）。改行キー（スマホは「完了」）か、ほかの所をタップすると保存されます。行を分けたいときは、PCは Shift+Enter、スマホは行を選んで「書き換える」を使います。右下の目のボタンは、増えた・消えたの色を隠して印だけを見るときに使います。",
+  "直し終えた印は「済みにする」。直した後の文が記録に残り、ひとことが出ます。",
+  "印や書き換えは、自動で暗号化してGitHubに保存されます（右上に「保存しました」と出ます）。作業の名前とフォルダだけは、この設定タブの「保存」で確定します。",
+];
+function renderSettings(){
+  const m = $("#main");
+  m.innerHTML = `<div class="grid2">
+    <div class="stack">
+      <div class="card stack"><h3 style="margin:0">表示</h3>
+        <div class="setrow"><label for="fsRange">文字の大きさ</label><button class="btn small" data-step="fs" data-d="-0.5" aria-label="文字を小さく">－</button><input type="range" id="fsRange" min="13" max="24" step="0.5" value="${txt.fs}"><button class="btn small" data-step="fs" data-d="0.5" aria-label="文字を大きく">＋</button><output id="fsOut"></output></div>
+        <div class="setrow"><label for="lhRange">行間</label><button class="btn small" data-step="lh" data-d="-0.05" aria-label="行間を狭く">－</button><input type="range" id="lhRange" min="1.4" max="2.6" step="0.05" value="${txt.lh}"><button class="btn small" data-step="lh" data-d="0.05" aria-label="行間を広く">＋</button><output id="lhOut"></output></div>
+        <div class="pv" aria-label="見え方の例">雨は昼前に上がった。
+縁側に出ると、敷石のくぼみにまだ水が残っていた。</div>
+        <label class="switch" for="notesToggle"><input type="checkbox" id="notesToggle" ${showNotes ? "checked" : ""}>印の中身（分類・コメント）を本文の下に表示する</label>
+        <label class="switch" for="darkToggle"><input type="checkbox" id="darkToggle" ${desk === "dark" ? "checked" : ""}>ダークモード</label>
+        <div class="row2"><button class="btn ghost" id="txtReset">文字の大きさと行間を元に戻す</button><span class="hint">表示の設定は、このページを開いている間だけ覚えます。</span></div>
+      </div>
+      <div class="card stack"><h3 style="margin:0">ひとこと</h3>
+        <label class="switch" for="praiseToggle"><input type="checkbox" id="praiseToggle" ${praiseOn ? "checked" : ""}>印を済みにしたり書き換えたりしたら、ひとことを出す</label>
+        <p class="hint" style="margin:0">直した内容（分類・字数の増減・台詞かどうかなど）に合わせて、用意した約120の文から選びます。AIは使いません。</p>
+      </div>
+      <div class="card stack"><h3 style="margin:0">この端末で使い終えたら</h3>
+        <p class="hint" style="margin:0">「閉じて鍵をかける」で、保存を済ませてから、このページが持っているデータを消して合言葉の画面に戻ります。30分さわらないときも同じように閉じます。使い終えたら、ブラウザの窓（シークレットウィンドウ）ごと閉じてください。</p>
+        <div class="row2"><button class="btn primary" id="ghLock">閉じて鍵をかける</button></div>
+        <p class="hint" style="margin:0">「全データを書き出す」は、あなたのPCで claude.ai の改稿机へ戻すときだけ使います。暗号化していないファイルが、その端末に残ります。</p>
+        <div class="row2"><button class="btn" id="ghExport">全データを書き出す</button></div>
+      </div>
+      ${cur ? `<div class="card stack"><h3 style="margin:0">作業の名前とフォルダ</h3>
+        ${cur.sample ? "" : `<label class="fld" for="wFolder">フォルダ（いちばん上のフォルダが作品名になります）<select id="wFolder" class="inp">${folderOptions(cur.folder || "")}</select></label>`}
+        <label class="fld" for="wTitle">作業の名前（節など。例: 3-2）<input type="text" id="wTitle" value="${esc(cur.title)}"></label>
+        ${cur.section ? `<label class="fld" for="wSection">節（前の版で入れた欄。作業の名前を節にしたら空にしてください）<input type="text" id="wSection" value="${esc(cur.section)}"></label>` : ""}
+        <p class="hint" style="margin:0" id="wPreview"></p>
+        <div class="row2"><button class="btn primary" id="wSave" disabled>保存</button><span class="hint" id="wState"></span><span style="flex:1"></span>${cur.sample ? "" : `<button class="btn danger" id="delWork">作業を削除</button>`}</div></div>` : ""}
+    </div>
+    <div class="card stack help" id="helpCard"><h3 style="margin:0">使い方</h3>
+      <ol>${HELP_ITEMS.map(t => `<li>${esc(t)}</li>`).join("")}</ol>
+      <div class="row2"><button class="btn" id="hSample">見本で試す</button><span class="hint">見本は保存されません。</span></div>
+    </div>
+  </div>`;
+  const showTxt = () => { $("#fsOut").textContent = txt.fs + "px"; $("#lhOut").textContent = txt.lh.toFixed(2); $("#fsRange").value = txt.fs; $("#lhRange").value = txt.lh; };
+  const setTxt = (fs, lh) => { txt = {fs: clampN(Math.round(fs * 2) / 2, 13, 24, TXT_DEF.fs), lh: clampN(Math.round(lh * 100) / 100, 1.4, 2.6, TXT_DEF.lh)}; applyText(); ls.set("kaikou.text", txt); showTxt(); };
+  showTxt();
+  $("#fsRange").oninput = e => setTxt(+e.target.value, txt.lh);
+  $("#lhRange").oninput = e => setTxt(txt.fs, +e.target.value);
+  m.querySelectorAll("[data-step]").forEach(b => b.onclick = () => { const d = +b.dataset.d; if (b.dataset.step === "fs") setTxt(txt.fs + d, txt.lh); else setTxt(txt.fs, txt.lh + d); });
+  $("#txtReset").onclick = () => setTxt(TXT_DEF.fs, TXT_DEF.lh);
+  $("#notesToggle").onchange = e => { showNotes = e.target.checked; ls.set("kaikou.showNotes", showNotes); };
+  $("#darkToggle").onchange = e => { desk = e.target.checked ? "dark" : "light"; ls.set("kaikou.desk", desk); applyDesk(); };
+  $("#praiseToggle").onchange = e => { praiseOn = e.target.checked; ls.set("kaikou.praise", praiseOn); toast(praiseOn ? "直したらひとこと届きます" : "ひとことを止めました"); };
+  $("#hSample").onclick = openSample;
+  bindGhSettings();
+  if (!cur) return;
+  // 名前とフォルダ: 書き換えると依頼の文での見え方を下に出し、「保存」で確定する
+  const form = () => ({title: $("#wTitle").value.trim() || cur.title, section: $("#wSection") ? $("#wSection").value.trim() : (cur.section || ""), folder: $("#wFolder") ? $("#wFolder").value : (cur.folder || "")});
+  const showForm = () => {
+    const f = form(), n = workNames(f), changed = f.title !== cur.title || f.section !== (cur.section || "") || f.folder !== (cur.folder || "");
+    $("#wPreview").textContent = `依頼の文では　作品: ${n.work}${n.section ? `　節: ${n.section}` : "　（節なし）"}`;
+    $("#wSave").disabled = !changed;
+    $("#wState").textContent = changed ? "まだ保存していません" : "";
+  };
+  ["wTitle", "wSection", "wFolder"].forEach(id => { const el = $("#" + id); if (el) { el.oninput = showForm; el.onchange = showForm; } });
+  showForm();
+  $("#wSave").onclick = () => {
+    const f = form();
+    cur.title = f.title; cur.section = f.section; cur.folder = f.folder;
+    scheduleSave(); flush();
+    const w = works.find(x => x.id === cur.id); if (w) { w.title = cur.title; w.section = cur.section; w.folder = cur.folder || ""; }
+    renderShelfBtn(); showForm(); toast("保存しました");
+  };
+  const del = $("#delWork");
+  if (del) del.onclick = async () => {
+    if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "もう一度押すと、版と記録もすべて削除します"; return; }
+    try { await store.deleteWork(cur.id); ls.del(draftKey()); works = works.filter(w => w.id !== cur.id); cur = null; versionsCache = requestsCache = null; toast("削除しました"); if (works[0]) await openWork(works[0].id); else renderAll(); }
+    catch (e) { toast("削除できませんでした"); }
+  };
+}
+function exportJson(vs, reqs){
+  return {format:"kaikou-record v2", exportedAt:nowIso(),
+    work:{id:cur.id, title:cur.title, section:cur.section, folder:cur.folder || "", createdAt:cur.createdAt, currentVersion:cur.currentVersion},
+    versions: vs.map(v => ({n:v.n, at:v.at, note:v.note, source:v.source, text:v.text})),
+    marks: cur.marks.map(m => ({id:m.id, kind:m.kind, type:m.type, inline: m.kind === "blank" && m.start != null && m.start === m.end, status:m.status, createdAt:m.createdAt, createdVersion:m.createdVersion, lineIndex:m.line, lineTexts:m.lineTexts, quote:m.quote, start:m.start, end:m.end, at:m.at ?? null, touched:m.touched ?? null, touchedHistory:m.touchedHistory ?? [], rangeLost:!!m.rangeLost, concerns:m.concerns, directions:m.directions, adds:m.adds, comment:m.comment, doneAt:m.doneAt ?? null, doneVersion:m.doneVersion ?? null, after:m.after ?? null, afterFill:m.afterFill ?? null, insertedLines:m.insertedLines ?? [], afterSameAsBefore:m.afterSameAsBefore ?? null})),
+    requests: reqs.map(r => ({at:r.at, version:r.version, markIds:r.markIds, scope:r.scope, format:r.format, text:r.text})),
+    globalComment: cur.globalComment || ""};
+}
+
+// ---------- 印の中身の吹き出し ----------
+// 一行のあらまし: 分類と向きとコメント
+function noteLine(m){
+  const tags = m.kind === "fix" ? [m.type !== "既存の文を直す" ? m.type : "", ...m.concerns, ...m.directions] : [markLabel(m), ...m.adds];
+  return [tags.filter(Boolean).join("・"), m.comment].filter(Boolean).join("｜") || "（分類もコメントもありません）";
+}
+const peekEl = () => document.querySelector(".peek");
+function closePeek(){ const p = peekEl(); if (p) p.remove(); }
+function showPeek(el, tap){
+  const mk = cur.marks.find(x => x.id === el.dataset.m) || (focus && focus.pending && focus.pending.id === el.dataset.m ? focus.pending : null);
+  if (!mk) return;
+  closePeek();
+  const tags = (mk.kind === "fix" ? [mk.type, ...mk.concerns, ...mk.directions] : [markLabel(mk), ...mk.adds]).filter(Boolean);
+  const p = document.createElement("div");
+  p.className = "peek" + (tap ? "" : " hoveronly"); p.dataset.m = mk.id; p.setAttribute("role", "tooltip");
+  p.innerHTML = `<div class="tags">${tags.map(t => `<span>${esc(t)}</span>`).join("")}</div>${mk.comment ? `<div class="pk-c">${esc(mk.comment)}</div>` : `<div class="hint">コメントはありません</div>`}${tap ? `<div class="pk-b"><button class="btn small ghost" data-pk="close">閉じる</button><button class="btn small primary" data-pk="open">開く</button></div>` : ""}`;
+  document.body.appendChild(p);
+  const r = el.getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+  const left = Math.max(12, Math.min(r.left, window.innerWidth - w - 12));
+  const below = r.bottom + 8 + h < window.innerHeight - 60;
+  p.style.left = left + "px"; p.style.top = (below ? r.bottom + 6 : Math.max(8, r.top - h - 6)) + "px";
+  if (tap) {
+    p.querySelector('[data-pk="close"]').onclick = closePeek;
+    p.querySelector('[data-pk="open"]').onclick = () => { closePeek(); openMarkEditor(cur.marks.find(x => x.id === mk.id)); };
+  }
+}
+// PC: 印にカーソルを合わせると吹き出し
+if (!touchUI) {
+  mainEl.addEventListener("mouseover", e => { if (view !== "text" || !cur || writeMode || inline || $("#modal").innerHTML) return; const el = e.target.closest("[data-m]"); if (el && (!peekEl() || peekEl().dataset.m !== el.dataset.m)) showPeek(el, false); });
+  mainEl.addEventListener("mouseout", e => { const el = e.target.closest("[data-m]"); if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) closePeek(); });
+}
+window.addEventListener("scroll", () => closePeek(), {passive:true});
+
+// ---------- ひとこと（決まった文から選ぶ。AIは使わない） ----------
+// 文の中の {q} は直した後の文の一部、{d} は増えた・減った字数、{n} は今日の数、{s} は続けた日数、{k} はまとめて済みにした数、{sum} は今日の内訳
+const PRAISE = {
+  concern: {
+    "リズム・文の流れ": ["文の流れの印を片づけました。読み返したときに引っかからない文は、直したことに気づかれないくらいでちょうどいいのだと思います。", "文の長さとつながりを見直しました。読み手の息継ぎの場所が一つ整いました。"],
+    "文末": ["文末を整えました。同じ形が続かないだけで、段落の読み心地は変わります。", "文末の印が一つ済みました。地味な直しですが、積み重なると文章の調子が落ち着きます。"],
+    "近接・重複": ["近くで重なっていた言葉を整理しました。読み手が引っかかる前に済ませておける、ありがたい直しです。", "重なりの印を片づけました。同じ語が離れるだけで、それぞれの言葉がよく見えるようになります。"],
+    "人物らしさ・口調": ["人物の口調を見直しました。その人がその場で言いそうな言葉かどうかを確かめるのは、作者にしかできない仕事です。", "人物らしさの印が済みました。台詞が一つその人らしくなると、前後の場面までその人の声で読めます。"],
+    "視点・見え方": ["語り手の見ている範囲を確かめ直しました。視点がそろうと、読み手は迷わずに場面の中にいられます。", "視点の印を片づけました。誰の目で見ているかがはっきりした分、場面の形がそろいます。"],
+    "説明くさい・わざとらしい": ["言いすぎていたところを見直しました。書かずに任せた分だけ、読み手が考える余地が残ります。", "説明の印が済みました。削るのは、書き足すより迷う直しです。"],
+    "時代・語彙": ["時代に合う言葉を確かめました。一語でも合わない言葉があると目立つので、確かめておく価値のある直しです。", "語彙の印を片づけました。調べたり迷ったりした時間は、本文の確かさとして残ります。"],
+    "印象・含み": ["受ける印象を整えました。同じ出来事でも、言葉の選び方で人物の見え方は変わります。", "含みの印が済みました。言い切らずに残したものは、読み手が拾ってくれます。"],
+    "整合性・事実": ["食い違いを直しました。読み手が気づく前に直せた矛盾は、なかったのと同じです。", "事実の印を片づけました。細かい整合を取っておくと、読み手は安心して物語についてこられます。"],
+    "情報の補い・分かりやすさ": ["分かりにくかったところを補いました。作者には見えていて読み手には見えていないものに気づけたのは、読み返したからこそです。", "補いの印が済みました。読み手が立ち止まらずに進める場所が一つ増えました。"],
+    "展開・間": ["間の取り方を見直しました。急ぎすぎないことも、場面の大事な一部です。", "展開の印を片づけました。速さが整うと、見せたい場面に読み手の注意が集まります。"],
+    "比喩・表現の違和感": ["言い回しの違和感を直しました。気になった表現をそのままにしなかったことが、何よりの手入れです。", "表現の印が済みました。意味がまっすぐ通る文は、それだけで読みやすくなります。"],
+    "語の指定": ["言葉を一つ選び直しました。小さな置き換えですが、その一語は作者が選んだ言葉になりました。", "語の印を片づけました。気になる一語を見逃さないのは、自分の文をよく読んでいるからです。"],
+    "締め・余韻": ["終わり方を整えました。最後の一文は読み手が次へ持っていくものなので、手をかけた分が残ります。", "締めの印が済みました。場面の終わりが決まると、次の場面にも入りやすくなります。"],
+    "なんとなく引っかかる": ["理由のはっきりしない引っかかりに向き合いました。説明できない違和感に気づけるのは、何度も読み返しているからです。", "引っかかりの印を片づけました。なんとなくを放っておかなかった分、読み心地が一つ整いました。"],
+  },
+  add: {
+    "心の動き・反応": ["人物の心の動きを書き足しました。出来事に人物がどう応じたかが分かると、読み手もその場に居合わせられます。", "反応を一つ入れました。小さな反応があるだけで、人物がその場にいることが伝わります。"],
+    "動作・しぐさ": ["しぐさを一つ足しました。言葉にしない気持ちは、手や体の動きのほうがよく伝わることがあります。", "動作の印が済みました。動きが見えると、場面の中で人物の居場所がはっきりします。"],
+    "情景・場の様子": ["場の様子を書き足しました。音や光が一つあるだけで、場面に奥行きが出ます。", "情景の印を片づけました。読み手が思い浮かべる景色が、作者の見ている景色に近づきました。"],
+    "時間の経過・間": ["時間の流れを入れました。間が書かれていると、人物の沈黙にも意味が生まれます。", "間の印が済みました。ひと呼吸の置き場所ができて、場面の速さが落ち着きます。"],
+    "説明・事情": ["事情を補いました。必要なことを必要なだけ伝えるのは、思ったより難しい作業です。", "説明の印が済みました。読み手が置いていかれないための一文になりました。"],
+    "台詞の言い方": ["台詞の言い方を書き足しました。同じ言葉でも、どう言ったかで人物の気持ちは変わって聞こえます。", "言い方の印を片づけました。声の調子が分かると、台詞が人物の声で読めます。"],
+    "締め・余韻": ["終わりの一文を入れました。場面を閉じる言葉が決まると、読み終えたあとに残るものが変わります。", "余韻の印が済みました。終わり方に手をかけた場面は、読み手の記憶に残りやすくなります。"],
+    "つなぎ（場面・話題の移り）": ["場面のつなぎを入れました。移り変わりがなめらかになると、読み手は立ち止まらずに次へ進めます。", "つなぎの印が済みました。場面と場面のあいだが整うと、全体の流れが一続きになります。"],
+  },
+  blank: ["空欄の印が済みました。前後の文に合う一語を探すのは、文章の仕事の中でもいちばん細かい作業です。", "穴埋めが一つ済みました。考えて選んだ一語は、本文の中で作者の言葉として残ります。"],
+  blankQ: ["空欄に「{q}」が入りました。これで文が一つ仕上がりました。"],
+  insert: ["新しい文を入れました。足した一文で、場面に必要だったものが一つそろいました。", "入れたい場所に文が入りました。書き足すのは削るより迷うことが多いので、一つ形にできたのは大きいです。", "書き足しの印が済みました。場面の中に、さっきまでなかったものが一つ増えました。"],
+  merge: ["文を一つにまとめました。ぶつ切りだったところが、一続きの動きとして読めるようになります。", "まとめの印が済みました。二つの文を一つに編むのは、言葉の順番まで考え直す直しです。"],
+  consult: ["相談の印を片づけました。迷ったところに答えを出せたのは、作品のことをよく分かっているからです。", "相談が一つ済みました。迷ったことを書き留めておいたから、こうして決められました。"],
+  fixQ: ["「{q}」の所を直しました。印を付けたときの違和感に、ちゃんと答えが出ています。", "「{q}」と直しましたね。作者が選び直した言葉として、本文に残ります。"],
+  same: ["読み直して、今のままでいいと決めました。直さないと決めるのも、立派な推敲です。", "元の文を残すことにしましたね。一度疑って確かめた文は、前よりも安心して読めます。", "見直した結果、そのままにしました。書いたときの判断でよかったと確かめられたのは収穫です。"],
+  plain: ["印を一つ片づけました。一つずつ確かめて進めているのがいいところです。", "直しが一つ済みました。こうした小さな手入れの積み重ねが、作品の読みやすさになります。", "済みが一つ増えました。気になった所をそのままにしない姿勢が、本文に出てきています。", "一つ片づきました。迷った所に答えを出せると、次の場面にも気持ちよく進めます。", "印が一つ済みました。自分の文と丁寧に向き合った時間が、ちゃんと本文に残っています。"],
+  multi: ["印を{k}件まとめて片づけました。直された所を一度に確かめられるのは、版を入れながら進めてきたからです。", "{k}件まとめて済みました。一つずつ直してきたことが、ここで形になりました。"],
+  allDone: ["この作業の印が、これで全部済みました。一つずつ確かめてきた分、本文は初めの版よりずっと落ち着いています。", "印がすべて片づきました。最後まで投げ出さずに向き合ったことが、何よりの成果です。", "未対応の印がなくなりました。直した場所の一つ一つが、いまは本文の一部になっています。", "これでこの作業に残っている印はありません。ここまで丁寧に進めてきましたね。おつかれさまでした。"],
+  edit: {
+    shorter: ["文を短くしました。削った分だけ、残した言葉がよく見えるようになります。", "言葉を削りました。書いたものを手放すのは惜しいものですが、その分文がすっきりします。", "{d}字短くなりました。削っても意味が通るのは、残す言葉を選べているからです。", "すっきりさせましたね。言いたいことが同じなら、短いほうが読み手に届きやすくなります。"],
+    longer: ["書き足しました。足した{d}字の中に、さっきまで場面になかったものが入っています。", "文を書き足して詳しくしました。足すべき所を見つけられたのは、場面をよく思い浮かべているからです。", "描写が増えました。読み手が思い浮かべられるものが一つ増えた分、場面がはっきりします。", "言葉を足しました。足りないと感じた所に手を入れられるのは、読み手の目で読み返せているからです。"],
+    merged: ["文をまとめました。行が減った分、ひと続きの動きとして読めるようになります。", "複数の文を一つにしました。つながりを考え直すのは、文の順番まで見直す丁寧な直しです。", "行をまとめましたね。短い文が続いていた所に、ひと息で読める流れができました。"],
+    split: ["長い文を分けました。区切りができると、読み手はそれぞれの文を落ち着いて受け取れます。", "文を分けましたね。一文に詰め込まないことで、一つ一つの動きがはっきりします。", "行を分けました。句点を一つ打つだけで、場面の速さが変わることがあります。"],
+    small: ["言葉を少しだけ入れ替えました。読み返して気づいた所を放っておかなかったのがいいところです。", "数文字の直しですが、文の調子はそれだけで変わります。", "一語を選び直しました。こうした細かい手入れは、作者にしかできません。", "わずかな直しですが、読み返したからこそ気づけた所です。"],
+    talk: ["台詞を直しました。人物が口にする言葉は、読み手がいちばんよく覚えている所です。", "台詞に手を入れました。言い回しが一つ変わるだけで、人物どうしの距離まで変わって聞こえます。", "会話を見直しました。やり取りの調子が整うと、場面が人物の声で進みます。"],
+    plain: ["書き換えを保存しました。今日も本文が少し前へ進みました。", "版が一つ進みました。前の版も残っているので、気になったらいつでも見比べられます。", "直しを一つ形にしました。手を動かした分だけ、本文はちゃんと変わっています。", "書き換えました。迷いながらでも決めて進めるのが、改稿でいちばん大事なところです。"],
+  },
+  first: ["今日の最初の直しです。", "今日も机に向かいましたね。", "今日の一つ目が済みました。"],
+  count: ["今日はこれで{n}件目です。", "今日の作業が{n}件になりました。", "{n}件まで来ました。今日はよく進んでいます。"],
+  countMany: ["{n}件目です。今日はたくさん手を動かしました。"],
+  streak: ["{s}日続けて机に向かっています。"],
+  streakLong: ["{s}日続きました。続けていることが、いちばんの力になります。"],
+  streakWeek: ["一週間続けて机に向かいました。"],
+  streakTwoWeeks: ["二週間続いています。もう習慣になっていますね。"],
+  streakMonth: ["{s}日続けて机に向かっています。ここまで続けたこと自体が、作品を支えています。"],
+  late: ["遅い時間までおつかれさまです。", "夜も更けてきました。無理のない所で区切ってください。", "夜遅くまで向き合っていますね。"],
+  morning: ["朝の時間に机に向かえましたね。", "朝から一つ進みました。", "朝の頭で読む文は、また違って見えます。"],
+  todayNone: ["今日はまだ作業の記録がありません。読み返すだけの日も、作品には必要な時間です。", "今日はまだこれからですね。気になる行に印を一つ付けるところから始めてみてください。"],
+  todayFew: ["今日は{sum}の作業をしました。少しずつでも机に向かった日は、ちゃんと前に進んでいます。", "今日の作業は{sum}です。短い時間でも、続けることに意味があります。", "今日は{sum}。小さく進めた日も、積み重ねの一日です。"],
+  todayMany: ["今日は{sum}。よく進みました。ゆっくり休んでください。", "今日の作業は{sum}でした。これだけ手を動かした日は、読み返すと本文の変化がよく分かります。", "今日は{sum}。たくさん向き合いましたね、おつかれさまでした。"],
+};
+// 最近出した文は、しばらく出さない（端末ごと）
+function pickLine(pool, vars = {}){
+  const list = (pool || []).filter(t => !/\{q\}/.test(t) || vars.q);
+  if (!list.length) return "";
+  const recent = ls.get("kaikou.praiseRecent", []);
+  const fresh = list.filter(t => !recent.includes(t));
+  const t = (fresh.length ? fresh : list)[Math.floor(Math.random() * (fresh.length ? fresh.length : list.length))];
+  ls.set("kaikou.praiseRecent", [...recent.filter(x => x !== t), t].slice(-40));
+  return t.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+}
+// 直した後の文から、引用に使う短い一部（12字まで）
+const shortQ = s => { const t = qt(s).replace(/^[「『]|[」』。、]$/g, ""); return t.length > 12 ? t.slice(0, 12) + "…" : t; };
+// 主な文のあとに添える一文（今日の数・続けた日数・時間帯）
+function extraLine(){
+  const d = activity.days[dayKey()] || {}, n = dayTotal(d), s = streak(), h = new Date().getHours();
+  if (n === 1) {
+    if (s >= 30) return pickLine(PRAISE.streakMonth, {s});
+    if (s >= 14 && s < 15) return pickLine(PRAISE.streakTwoWeeks);
+    if (s === 7) return pickLine(PRAISE.streakWeek);
+    if (s >= 5) return pickLine(PRAISE.streakLong, {s});
+    if (s >= 2) return pickLine(PRAISE.streak, {s});
+    return pickLine(PRAISE.first);
+  }
+  if ([5, 10, 15].includes(n)) return pickLine(PRAISE.count, {n});
+  if (n >= 20 && n % 10 === 0) return pickLine(PRAISE.countMany, {n});
+  if (Math.random() < 0.3) {
+    if (h >= 23 || h < 4) return pickLine(PRAISE.late);
+    if (h >= 5 && h < 9) return pickLine(PRAISE.morning);
+  }
+  return "";
+}
+let praiseTimer = null;
+function showPraise(text, label = "ひとこと"){
+  const el = $("#praise");
+  el.innerHTML = `<div class="praise" role="status"><div class="pt"><span class="pl">${esc(label)}</span><span id="praiseText">${esc(text)}</span></div><button class="btn ghost small" id="praiseClose" aria-label="閉じる">閉じる</button></div>`;
+  $("#praiseClose").onclick = () => { el.innerHTML = ""; };
+  placePraise();
+  clearTimeout(praiseTimer);
+  praiseTimer = setTimeout(() => { el.innerHTML = ""; }, 15000);
+}
+function placePraise(){ const p = document.querySelector(".praise"); if (p) p.classList.toggle("up", !!$("#bar").innerHTML); }
+function sayPraise(main, kind, label){
+  if (!praiseOn && kind !== "today") return;
+  const text = [main, kind === "today" ? "" : extraLine()].filter(Boolean).join("");
+  if (!text) return;
+  showPraise(text, label);
+  if (!(cur && cur.sample)) { (activity.praises ||= []).push({at:nowIso(), text, workId:cur ? cur.id : null}); activity.praises = activity.praises.slice(-30); store.putMeta("activity", activity).catch(() => {}); }
+}
+function praiseForMarks(ms){
+  const allDone = cur.marks.length > 0 && cur.marks.every(m => m.status === "done");
+  if (allDone) return sayPraise(pickLine(PRAISE.allDone), "done", "すべて済みました");
+  if (ms.length > 1) return sayPraise(pickLine(PRAISE.multi, {k: ms.length}), "done", "ひとこと");
+  const m = ms[0], q = shortQ(m.kind === "blank" && m.afterFill ? m.afterFill : m.after);
+  if (m.afterSameAsBefore) return sayPraise(pickLine(PRAISE.same), "done", "ひとこと");
+  let pool;
+  if (m.kind === "fix") {
+    if (m.type === "一文にまとめる") pool = PRAISE.merge;
+    else if (m.type === "相談") pool = PRAISE.consult;
+    else pool = PRAISE.concern[m.concerns[0]];
+    if (q && Math.random() < 0.25) pool = PRAISE.fixQ;
+  } else {
+    pool = PRAISE.add[m.adds[0]] || (m.kind === "insert" ? PRAISE.insert : PRAISE.blank);
+    if (m.kind === "blank" && m.afterFill && Math.random() < 0.35) pool = PRAISE.blankQ;
+    else if (Math.random() < 0.3) pool = m.kind === "insert" || (m.start != null && m.start === m.end) ? PRAISE.insert : PRAISE.blank;
+  }
+  if (!pool || Math.random() < 0.15) pool = PRAISE.plain;
+  sayPraise(pickLine(pool, {q: m.kind === "blank" && m.afterFill ? shortQ(m.afterFill) : q}), "done", "ひとこと");
+}
+function praiseForEdit(before, after){
+  const A = linesOf(before), B = linesOf(after);
+  const rows = alignRows(A, B).filter(r => r.t !== "eq");
+  if (!rows.length) return;
+  const nonEmpty = L => L.filter(l => l.trim()).length;
+  const dl = nonEmpty(B) - nonEmpty(A), d = nsLen(after) - nsLen(before);
+  const oldT = rows.map(r => r.o != null ? A[r.o] : "").join(""), newT = rows.map(r => r.c != null ? B[r.c] : "").join("");
+  const ops = charOps(oldT, newT), changed = ops ? ops.filter(o => o.t !== "eq").length : Infinity;
+  const talk = rows.some(r => r.c != null && /^[\s　]*「/.test(B[r.c]));
+  let pool;
+  if (dl < 0) pool = PRAISE.edit.merged;
+  else if (dl > 0 && Math.abs(d) <= 10) pool = PRAISE.edit.split;
+  else if (changed <= 4) pool = PRAISE.edit.small;
+  else if (talk && Math.random() < 0.5) pool = PRAISE.edit.talk;
+  else if (d <= -5) pool = PRAISE.edit.shorter;
+  else if (d >= 5) pool = PRAISE.edit.longer;
+  else pool = talk ? PRAISE.edit.talk : PRAISE.edit.plain;
+  if (Math.random() < 0.15) pool = PRAISE.edit.plain;
+  sayPraise(pickLine(pool, {d: Math.abs(d)}), "edit", "ひとこと");
+}
+function praiseToday(){
+  const d = activity.days[dayKey()] || {}, n = dayTotal(d);
+  const sum = [["印", d.marks, "件"], ["済み", d.done, "件"], ["書き換え", d.edits, "回"]].filter(x => x[1]).map(x => x[0] + x[1] + x[2]).join("・");
+  const main = pickLine(!n ? PRAISE.todayNone : n < 5 ? PRAISE.todayFew : PRAISE.todayMany, {sum});
+  const s = streak();
+  sayPraise(main + (n && s >= 2 ? pickLine(s >= 5 ? PRAISE.streakLong : PRAISE.streak, {s}) : ""), "today", "今日のひとこと");
+}
+
+// ---------- 棚（フォルダと作業） ----------
+function allFolders(){
+  const set = new Set(folders);
+  for (const w of works) if (w.folder) set.add(w.folder);
+  for (const p of [...set]) { const parts = p.split("/"); for (let k = 1; k < parts.length; k++) set.add(parts.slice(0, k).join("/")); }
+  return [...set].sort((a, b) => a.localeCompare(b, "ja"));
+}
+function folderOptions(selected){
+  return `<option value="">（フォルダに入れない）</option>` + allFolders().map(p => `<option value="${esc(p)}"${p === selected ? " selected" : ""}>${esc(p.split("/").join(" › "))}</option>`).join("");
+}
+function renderShelfBtn(){
+  const b = $("#shelfBtn");
+  if (!cur) { b.innerHTML = works.length ? "作業を選ぶ" : "作業はまだありません"; return; }
+  const crumb = cur.folder ? cur.folder.split("/").map(esc).join(" › ") + " › " : "";
+  b.innerHTML = `<span class="crumb">${crumb}</span>${esc(cur.title)}${cur.section ? "　" + esc(cur.section) : ""}`;
+}
+async function saveFolders(){ if (store) await store.putMeta("folders", {paths: folders, order: workOrder}).catch(() => toast("フォルダを保存できませんでした")); }
+// フォルダごとの作業の並び（自分で並べ替えた順。並べていない作業は節の名前の順で後ろへ）
+let workOrder = {}, shelfSorting = false;
+function sortedWorks(path){
+  const ws = works.filter(w => (w.folder || "") === path).sort((a, b) => (a.section || a.title).localeCompare(b.section || b.title, "ja", {numeric:true}));
+  const ord = workOrder[path] || [];
+  const at = w => { const k = ord.indexOf(w.id); return k < 0 ? Infinity : k; };
+  return ws.map((w, k) => ({w, k})).sort((a, b) => (at(a.w) - at(b.w)) || (a.k - b.k)).map(x => x.w);
+}
+async function moveWork(id, path, d){
+  const list = sortedWorks(path).map(w => w.id), k = list.indexOf(id), j = k + d;
+  if (k < 0 || j < 0 || j >= list.length) return;
+  [list[k], list[j]] = [list[j], list[k]];
+  workOrder[path] = list; await saveFolders();
+  const sc = document.querySelector(".dialog") ? document.querySelector(".dialog").scrollTop : 0;
+  openShelf(); const dl = document.querySelector(".dialog"); if (dl) dl.scrollTop = sc;
+}
+function openShelf(){
+  const fs = allFolders(), openSet = new Set(ls.get("kaikou.shelfOpen", fs));
+  const wrow = (w, path) => shelfSorting
+    ? `<div class="witem"><span>${esc(w.title)}${w.section ? "　" + esc(w.section) : ""}</span><span class="sub" style="display:flex;gap:4px"><button class="btn small" data-up="${w.id}" data-p="${esc(path)}" aria-label="上へ">↑</button><button class="btn small" data-down="${w.id}" data-p="${esc(path)}" aria-label="下へ">↓</button></span></div>`
+    : `<button class="witem${cur && cur.id === w.id ? " cur" : ""}" data-w="${w.id}"><span>${esc(w.title)}${w.section ? "　" + esc(w.section) : ""}</span><span class="sub">${w.open ? `未対応${w.open}・` : ""}${fmtTime(w.updatedAt)}</span></button>`;
+  const node = path => {
+    const name = path.split("/").pop(), kids = fs.filter(p => p.startsWith(path + "/") && !p.slice(path.length + 1).includes("/"));
+    const ws = sortedWorks(path);
+    const count = works.filter(w => (w.folder || "") === path || (w.folder || "").startsWith(path + "/")).length;
+    return `<details data-path="${esc(path)}"${openSet.has(path) ? " open" : ""}><summary>${esc(name)}<span class="cnt">${count}</span><span class="fbtns"><button class="btn small" data-addw="${esc(path)}">＋作業</button><button class="btn small" data-addf="${esc(path)}">＋フォルダ</button><button class="btn small ghost" data-renf="${esc(path)}">名前</button></span></summary>${kids.map(node).join("")}${ws.map(w => wrow(w, path)).join("")}${!kids.length && !ws.length ? `<p class="hint" style="margin:4px 0 8px">空のフォルダです。</p>` : ""}</details>`;
+  };
+  const roots = fs.filter(p => !p.includes("/"));
+  const loose = sortedWorks("");
+  showModal(`<h2>作業の棚</h2>
+    <div class="tree">${roots.map(node).join("")}
+      ${loose.length ? `<div style="margin-top:6px"><span class="hint">フォルダに入っていない作業</span>${loose.map(w => wrow(w, "")).join("")}</div>` : ""}
+      ${!works.length && !roots.length ? `<p class="hint">まだ作業がありません。「新しい作業」から始めるか、見本で試してください。</p>` : ""}
+    </div>
+    ${shelfSorting ? `<p class="hint" style="margin:0">↑↓で作業の順番を変えられます。終わったら「並び替えを終える」を押してください。</p>` : ""}
+    <div class="row2"><button class="btn${shelfSorting ? " primary" : ""}" id="shSort">${shelfSorting ? "並び替えを終える" : "並び替え"}</button><button class="btn" id="shAddF">＋フォルダ</button><button class="btn" id="shSample">見本で試す</button><button class="btn" id="shHelp">使い方</button></div>
+    <div class="dfoot"><button class="btn ghost" id="shClose">閉じる</button><button class="btn primary" id="shNew">新しい作業</button></div>`);
+  const d = $(".dialog");
+  d.querySelectorAll("details").forEach(x => x.addEventListener("toggle", () => { const s = new Set(ls.get("kaikou.shelfOpen", fs)); if (x.open) s.add(x.dataset.path); else s.delete(x.dataset.path); ls.set("kaikou.shelfOpen", [...s]); }));
+  d.querySelectorAll("[data-w]").forEach(b => b.onclick = async () => { closeModal(); await openWork(b.dataset.w); });
+  d.querySelectorAll("[data-addw]").forEach(b => b.onclick = e => { e.preventDefault(); openNewWork(b.dataset.addw); });
+  d.querySelectorAll("[data-addf]").forEach(b => b.onclick = e => { e.preventDefault(); openFolderDialog(b.dataset.addf, null); });
+  d.querySelectorAll("[data-renf]").forEach(b => b.onclick = e => { e.preventDefault(); openFolderDialog(null, b.dataset.renf); });
+  $("#shAddF").onclick = () => openFolderDialog("", null);
+  $("#shSort").onclick = () => { shelfSorting = !shelfSorting; openShelf(); };
+  d.querySelectorAll("[data-up]").forEach(b => b.onclick = () => moveWork(b.dataset.up, b.dataset.p, -1));
+  d.querySelectorAll("[data-down]").forEach(b => b.onclick = () => moveWork(b.dataset.down, b.dataset.p, 1));
+  $("#shSample").onclick = openSample;
+  $("#shHelp").onclick = openHelp;
+  $("#shClose").onclick = () => { shelfSorting = false; closeModal(); };
+  $("#shNew").onclick = () => openNewWork(cur && !cur.sample ? cur.folder || "" : "");
+}
+// parent を渡すと新しいフォルダ、path を渡すと名前を変える
+function openFolderDialog(parent, path){
+  const renaming = path != null;
+  const empty = renaming && !works.some(w => (w.folder || "") === path || (w.folder || "").startsWith(path + "/")) && !allFolders().some(p => p.startsWith(path + "/"));
+  showModal(`<h2>${renaming ? "フォルダの名前を変える" : "新しいフォルダ"}</h2>
+    ${!renaming && parent ? `<p class="hint" style="margin:0">「${esc(parent.split("/").join(" › "))}」の中に作ります。</p>` : ""}
+    <label class="fld" for="fName">フォルダの名前<input type="text" id="fName" value="${renaming ? esc(path.split("/").pop()) : ""}" placeholder="例: 3章"></label>
+    <div class="dfoot">${renaming && empty ? `<button class="btn danger left" id="fDel">このフォルダを消す</button>` : ""}<button class="btn ghost" id="fCancel">戻る</button><button class="btn primary" id="fOk">${renaming ? "変える" : "作る"}</button></div>`, {lock:true});
+  $("#fName").focus();
+  $("#fCancel").onclick = openShelf;
+  const fd = $("#fDel"); if (fd) fd.onclick = async () => { folders = folders.filter(p => p !== path); await saveFolders(); toast("フォルダを消しました"); openShelf(); };
+  $("#fOk").onclick = async () => {
+    const name = $("#fName").value.trim().replace(/\//g, "／");
+    if (!name) { toast("名前を入れてください"); return; }
+    if (!renaming) {
+      const p = parent ? parent + "/" + name : name;
+      if (allFolders().includes(p)) { toast("同じ名前のフォルダがあります"); return; }
+      folders.push(p); await saveFolders(); toast("フォルダを作りました"); openShelf(); return;
+    }
+    const base = path.split("/").slice(0, -1), np = [...base, name].join("/");
+    if (np === path) { openShelf(); return; }
+    if (allFolders().includes(np)) { toast("同じ名前のフォルダがあります"); return; }
+    const mv = p => p === path ? np : p.startsWith(path + "/") ? np + p.slice(path.length) : p;
+    folders = allFolders().map(mv);
+    const wo = {}; for (const [k, v] of Object.entries(workOrder)) wo[k ? mv(k) : k] = v; workOrder = wo;
+    for (const w of works) if (w.folder && mv(w.folder) !== w.folder) {
+      const nf = mv(w.folder); w.folder = nf;
+      if (cur && cur.id === w.id) { cur.folder = nf; scheduleSave(); }
+      else { try { const full = await store.getWork(w.id); if (full) { full.folder = nf; await store.putWork(full); } } catch {} }
+    }
+    await saveFolders(); renderShelfBtn(); toast("名前を変えました"); openShelf();
+  };
+}
+// 使い方は設定タブに置く
+function openHelp(){
+  closeModal(); view = "settings"; renderAll();
+  const h = $("#helpCard"); if (h) h.scrollIntoView({block:"start"});
+}
+
+// ---------- 作業の作成と切り替え ----------
+const NEW_DRAFT = "kaikou.draft.new";
+function openNewWork(folder){
+  const dr = ls.get(NEW_DRAFT, null) || {};
+  const f = folder ?? dr.folder ?? (cur && !cur.sample ? cur.folder || "" : "");
+  showModal(`<h2>新しい作業</h2>
+    <label class="fld" for="nwFolder">フォルダ（いちばん上のフォルダが作品名になります）<select id="nwFolder" class="inp">${folderOptions(f)}</select></label>
+    <label class="fld" for="nwTitle">作業の名前（節など）<input type="text" id="nwTitle" placeholder="例: 3-2" value="${esc(dr.title || "")}"></label>
+    <p class="hint" style="margin:0" id="nwPreview"></p>
+    <label class="fld" for="nwText">原文（一文一行のまま貼り付け）<textarea id="nwText" class="body">${esc(dr.text || "")}</textarea></label>
+    <p class="hint" style="margin:0">書きかけはこの端末に自動で残ります。ほかのアプリへ移って戻っても続きから書けます。</p>
+    <div class="dfoot"><button class="btn ghost" id="nwCancel">閉じる</button><button class="btn primary" id="nwOk">作る</button></div>`, {lock:true});
+  const preview = () => { const n = workNames({folder:$("#nwFolder").value, title:$("#nwTitle").value}); $("#nwPreview").textContent = n.work ? `依頼の文では　作品: ${n.work}${n.section ? `　節: ${n.section}` : ""}` : "フォルダを選ぶと、いちばん上のフォルダが依頼の文の作品名になります。"; };
+  const keep = () => { ls.set(NEW_DRAFT, {folder:$("#nwFolder").value, title:$("#nwTitle").value, text:$("#nwText").value}); preview(); };
+  ["nwFolder","nwTitle","nwText"].forEach(id => { $("#" + id).addEventListener("input", keep); $("#" + id).addEventListener("change", keep); });
+  preview();
+  $("#nwCancel").onclick = () => {
+    const b = $("#nwCancel");
+    if ($("#nwText").value.trim() && !b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "貼った本文を捨てて閉じる"; return; }
+    ls.del(NEW_DRAFT); closeModal();
+  };
+  $("#nwOk").onclick = async () => {
+    const text = $("#nwText").value.replace(/\r\n?/g, "\n");
+    if (!text.trim()) { toast("原文を貼り付けてください"); return; }
+    $("#nwOk").disabled = true;
+    await storeReady;
+    const t = nowIso();
+    const w = {id:uid("w"), title:$("#nwTitle").value.trim() || `作業 ${fmtTime(t)}`, section:"", folder:$("#nwFolder").value, original:text, current:text, currentVersion:0, marks:[], globalComment:"", createdAt:t, updatedAt:t};
+    // 作業の記録には原文と今の本文の二つが入るので、印を付ける余地を残して長すぎる本文は断る
+    if (docBytes(w) > 160 * 1024) { $("#nwOk").disabled = false; toast(`本文が長すぎて保存できません（${nsLen(text)}字）。2万字ほどまでの節に分けて、別々の作業にしてください`); return; }
+    try {
+      await store.putWork(w); await store.addVersion(w.id, {n:0, text, at:t, note:"原文", source:"original", nonspace:nsLen(text)});
+      ls.del(NEW_DRAFT);
+      works.unshift({id:w.id, title:w.title, section:w.section, folder:w.folder, updatedAt:t, open:0});
+      cur = w; editing = null; versionsCache = [{n:0, text, at:t, note:"原文", source:"original", nonspace:nsLen(text)}]; requestsCache = []; baseText = null; baseLabel = "原文"; baseN = null;
+      closeModal(); view = "text"; renderAll(); toast("作りました"); setStatus(`保存しました（${store.label}）`);
+    } catch (e) { const b = $("#nwOk"); if (b) b.disabled = false; toast("作れませんでした: " + errText(e)); }
+  };
+}
+async function openWork(id){
+  await storeReady;
+  await flush();
+  setStatus("読み込み中…");
+  try { cur = await store.getWork(id); } catch { cur = null; }
+  undoCache.clear();
+  if (cur) { cur.marks ||= []; upgradeMarks(); ls.set("kaikou.lastWork", id); moveOldUndo(); }
+  editing = null; versionsCache = null; requestsCache = null; baseText = null; baseLabel = "原文"; baseN = null; sel.lines.clear(); sel.range = null;
+  setStatus(cur ? store.label : "読み込めませんでした");
+  renderAll();
+}
+$("#shelfBtn").onclick = openShelf;
+$("#newWorkBtn").onclick = () => openNewWork();
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => { view = t.dataset.view; renderAll(); });
+
+function renderBadge(){ $("#openCount").textContent = cur ? cur.marks.filter(m => m.status === "open").length : 0; }
+function renderView(){
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.view === view)));
+  renderBadge();
+  closePeek();
+  if (view === "text") renderText(); else if (view === "request") renderRequest(); else if (view === "versions") renderVersions(); else if (view === "settings") renderSettings(); else renderLog();
+  renderBar(); renderFab();
+}
+function renderAll(){ renderShelfBtn(); renderView(); renderToday(); }
+
+window.addEventListener("pagehide", () => { flush(); });
+// 裏で起きた誤りを画面の右上に出す（黙って止まらないように）
+const showErr = msg => setStatus(`うまく動かなかった操作があります（${String(msg).slice(0, 80)}）。もう一度試すか、ページを読み直してください`);
+window.addEventListener("error", e => showErr(e.message || e.error));
+window.addEventListener("unhandledrejection", e => showErr((e.reason && (e.reason.message || e.reason.code)) || e.reason));
+
+// ---------- 起動 ----------
+// 保存先が決まるまでは、作業を作る・開く操作を待たせる（端末だけの保存に入ってしまわないように）
+let storeReadyDone; const storeReady = new Promise(r => storeReadyDone = r);
+async function boot(){
+  await ghWaitUnlock();
+  store = ghStore();
+  renderAll();
+  works = await store.listWorks();
+  try { const f = await store.getMeta("folders"); folders = f && Array.isArray(f.paths) ? f.paths.slice() : []; workOrder = f && f.order ? clone(f.order) : {}; } catch { folders = []; }
+  try { const a = await store.getMeta("activity"); if (a) activity = {days:a.days || {}, praises:a.praises || []}; } catch {}
+  storeReadyDone();
+  setStatus(store.label);
+  const last = ls.get("kaikou.lastWork", null);
+  const first = works.find(w => w.id === last) || works[0];
+  if (first) await openWork(first.id); else renderAll();
+  // 新しい作業の書きかけがあれば、窓を開き直す（ほかのアプリから戻ったときにページが読み直されても続けられるように）
+  const dr = ls.get(NEW_DRAFT, null);
+  if (dr && dr.text && dr.text.trim() && !$("#modal").innerHTML) openNewWork();
+}
+boot();
+})();
+</script>
